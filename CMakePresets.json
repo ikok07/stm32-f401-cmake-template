@@ -1,0 +1,26 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "arm-cortex-m4",
+      "displayName": "ARM Cortex M4",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/cmake-build-debug",
+      "toolchainFile": "cubeide-gcc.cmake",
+      "vendor": {
+        "jetbrains.com/clion": {}
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "ARM",
+      "configurePreset": "arm-cortex-m4"
+    }
+  ]
+}
