@@ -52,6 +52,7 @@ set (PROJECT_SOURCES
 	src/syscalls.c
 	src/sysmem.c
 	drivers/src/gpio_driver.c
+	drivers/src/spi_driver.c
 )
 
 set (PROJECT_DEFINES
