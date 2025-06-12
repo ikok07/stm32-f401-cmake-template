@@ -153,7 +153,7 @@ void SPI_DeInit(SPI_TypeDef *pSPIx);
  * Data send and receive
  */
 int SPI_SendData(SPI_Handle_t *pSPIHandle, uint8_t *pTXBuffer, uint32_t len);
-void SPI_ReceiveData(SPI_Handle_t *pSPIHandle, uint8_t *pRXBuffer, uint32_t len);
+int SPI_ReceiveData(SPI_Handle_t *pSPIHandle, uint8_t *pRXBuffer, uint32_t len);
 
 /*
  * Other controls
