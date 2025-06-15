@@ -39,7 +39,7 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle) {
     // GPIO Mode Configuration
     pGPIOHandle->pGPIOx->MODER &=~ (0b11 << (2 * pinNumber)); // Clear the mode bits
     if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode <= GPIO_MODE_ANALOG) {
-        pGPIOHandle->pGPIOx->MODER |= pGPIOHandle->GPIO_PinConfig.GPIO_PinMode;
+        pGPIOHandle->pGPIOx->MODER |= pGPIOHandle->GPIO_PinConfig.GPIO_PinMode << (2 * pinNumber);
     } else {
         // Configure rising / falling edge
         if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_MODE_INPUT_R_EDGE) {

@@ -10,4 +10,6 @@
 #define SET                ENABLE
 #define RESET              DISABLE
 
+#define __weak             __attribute__((weak))
+
 #endif //COMMONS_H

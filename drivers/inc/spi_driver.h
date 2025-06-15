@@ -44,6 +44,12 @@
                                                 }                                               \
                                              } while(0)
 
+#define SPI_INDEX_TO_IRQ_NUMBER(index) ((index == 1) ? SPI1_IRQn :\
+                                        (index == 2) ? SPI2_IRQn :\
+                                        (index == 3) ? SPI3_IRQn :\
+                                        (index == 4) ? SPI4_IRQn :\
+                                        SPI1_IRQn)
+
 /**
  * @SPI_MODES
  */
@@ -119,6 +125,20 @@
 #define SPI_SS_LOW                          0
 #define SPI_SS_HIGH                         1
 
+/**
+ * @SPI_STATE
+ */
+#define SPI_STATE_READY                     0
+#define SPI_STATE_BUSY_TX                   1
+#define SPI_STATE_BUSY_RX                   2
+
+/**
+ * @SPI_EVENT
+ */
+#define SPI_EVENT_TX_COMPLETE               0
+#define SPI_EVENT_RX_COMPLETE               1
+#define SPI_EVENT_OVR_ERR_COMPLETE          2
+
 typedef struct {
     uint8_t SPI_DeviceMode;                 /** Possible values from @SPI_MODES */
     uint8_t SPI_BusConfig;                  /** Possible values from @SPI_BUS_CONFIGURATIONS */
@@ -136,6 +156,12 @@ typedef struct {
 typedef struct {
     SPI_TypeDef *pSPIx;
     SPI_Config_t SPIConfig;
+    uint8_t *pTXBuffer;
+    uint8_t *pRXBuffer;
+    uint32_t TXLen;
+    uint32_t RXLen;
+    uint8_t TXState;                        /** Possible values from @SPI_STATE */
+    uint8_t RXState;                        /** Possible values from @SPI_STATE */
 } SPI_Handle_t;
 
 /*
@@ -152,13 +178,33 @@ void SPI_DeInit(SPI_TypeDef *pSPIx);
 /*
  * Data send and receive
  */
-int SPI_SendData(SPI_Handle_t *pSPIHandle, uint8_t *pTXBuffer, uint32_t len);
-int SPI_ReceiveData(SPI_Handle_t *pSPIHandle, uint8_t *pRXBuffer, uint32_t len);
+uint8_t SPI_SendData(SPI_Handle_t *pSPIHandle, uint8_t *pTXBuffer, uint32_t len);
+uint8_t SPI_ReceiveData(SPI_Handle_t *pSPIHandle, uint8_t *pRXBuffer, uint32_t len);
+uint8_t SPI_SendReceiveData(SPI_Handle_t *pSPIHandle, uint8_t *pTXBuffer, uint8_t *pRXBuffer, uint32_t len);
+
+uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTXBuffer, uint32_t len);
+uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRXBuffer, uint32_t len);
 
 /*
  * Other controls
  */
-void SPI_PeripheralControl(SPI_TypeDef *pSPIx, uint8_t enabled);
+uint8_t SPI_PeripheralEnabled(SPI_TypeDef *pSPIx);
+void SPI_PeripheralControl(SPI_Handle_t *pSPIHandle, uint8_t enabled);
+void SPI_PeripheralForceDisable(SPI_Handle_t *pSPIHandle);
 void SPI_BidirectionalModeDirection(SPI_TypeDef *pSPIx, uint8_t enableTx);
+void SPI_CloseTransmission(SPI_Handle_t *pSPIHandle);
+void SPI_CloseReception(SPI_Handle_t *pSPIHandle);
+void SPI_ClearOVRFlag(SPI_Handle_t *pSPIHandle);
+
+/*
+ * IRQ Configuration
+ */
+void SPI_IRQConfig(uint8_t PerIndex, uint8_t IRQPriority, uint8_t Enabled);
+void IRQ_Handling(SPI_Handle_t *pSPIHandle);
+
+/*
+ * Application callback
+ */
+void SPI_ApplicationEventCallback(SPI_Handle_t *pSPIHandle, uint8_t AppEvent);
 
 #endif //SPI_DRIVER_H

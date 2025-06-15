@@ -31,7 +31,7 @@ set (RUNTIME_LIBRARY_SYSCALLS_MINIMAL "--specs=nosys.specs")
 set (RUNTIME_LIBRARY_SYSCALLS_NONE    "")
 set (MFLOAT_ABI_SOFTWARE              "-mfloat-abi=soft")
 set (MFLOAT_ABI_HARDWARE              "-mfloat-abi=hard")
-set (MFLOAT_ABI_MIX                   "-mfloat-abi=softfp")
+set (MFLOAT_ABI_MIX                   "Debug")
 #######################################################################
 
 ###################### VARIABLES ######################################
@@ -75,6 +75,25 @@ set (PROJECT_INCLUDES
 ################## PROJECT SETUP ######################################
 project(${PROJECT_NAME})
 enable_language(ASM)
+
+# Debug/Release specific flags
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g3 -O0 -DDEBUG")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -O0 -DDEBUG")
+	set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -g3")
+	message(STATUS "Debug build configuration")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Os -DRELEASE")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os -DRELEASE")
+	message(STATUS "Release build configuration")
+else()
+	# Default to Debug if not specified
+	set(CMAKE_BUILD_TYPE "Debug")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g3 -O0 -DDEBUG")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -O0 -DDEBUG")
+	set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -g3")
+	message(STATUS "Default Debug build configuration")
+endif()
 
 if (${PROJECT_TYPE} MATCHES ${PROJECT_TYPE_EXECUTABLE})
   add_executable(${PROJECT_NAME} ${PROJECT_SOURCES})
