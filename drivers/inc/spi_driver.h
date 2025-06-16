@@ -186,6 +186,12 @@ uint8_t SPI_SendDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pTXBuffer, uint32_t le
 uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRXBuffer, uint32_t len);
 
 /*
+ * NSS Control
+ */
+void SPI_SlaveSelect(SPI_Handle_t *pSPIHandle, GPIO_TypeDef *pGPIOx, uint8_t pinNumber);
+void SPI_SlaveDeSelect(SPI_Handle_t *pSPIHandle, GPIO_TypeDef *pGPIOx, uint8_t pinNumber);
+
+/*
  * Other controls
  */
 uint8_t SPI_PeripheralEnabled(SPI_TypeDef *pSPIx);

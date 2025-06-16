@@ -350,6 +350,16 @@ uint8_t SPI_ReceiveDataIT(SPI_Handle_t *pSPIHandle, uint8_t *pRXBuffer, uint32_t
     return 0;
 }
 
+void SPI_SlaveSelect(SPI_Handle_t *pSPIHandle, GPIO_TypeDef *pGPIOx, uint8_t pinNumber) {
+    pSPIHandle->pSPIx->CR1 &=~ (1 << SPI_CR1_SSI_Pos);
+    pGPIOx->ODR &=~ (1 << pinNumber);
+}
+
+void SPI_SlaveDeSelect(SPI_Handle_t *pSPIHandle, GPIO_TypeDef *pGPIOx, uint8_t pinNumber) {
+    pSPIHandle->pSPIx->CR1 |= (1 << SPI_CR1_SSI_Pos);
+    pGPIOx->ODR |= (1 << pinNumber);
+}
+
 /**
  *
  * @param pSPIx Base address of the SPI peripheral

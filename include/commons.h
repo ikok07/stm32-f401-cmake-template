@@ -5,6 +5,8 @@
 #ifndef COMMONS_H
 #define COMMONS_H
 
+#define HSE_VALUE          8000000
+
 #define ENABLE             1
 #define DISABLE            0
 #define SET                ENABLE

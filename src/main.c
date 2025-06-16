@@ -32,7 +32,7 @@ SPI_Handle_t spiHandle = {
         .SPI_SclkSpeed = SPI_SCLK_SPEED_DIV256,
         .SPI_BitsOrder = SPI_BO_MSBFIRST,
         .SPI_FrameFormat = SPI_FF_MOTOROLA,
-        .SPI_SSM = SPI_SSM_HW,
+        .SPI_SSM = SPI_SSM_SW,
         .SPI_CPHA = SPI_CPHA_1EDGE,
         .SPI_CPOL = SPI_CPOL_LOW,
         .SPI_SS_ActiveLevel = SPI_SS_LOW,
@@ -63,16 +63,12 @@ int main(void) {
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
-    // Init SPI NSS
+    // Init SPI SCK
     gpioHandle.pGPIOx = GPIOB;
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_NSS;
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_SCK;
     gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_ALTERNATE;
     gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NO_PUPD;
     gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF5;
-    GPIO_Init(&gpioHandle);
-
-    // Init SPI SCK
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_SCK;
     GPIO_Init(&gpioHandle);
 
     // Init SPI MISO
@@ -83,6 +79,12 @@ int main(void) {
     gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_MOSI;
     GPIO_Init(&gpioHandle);
 
+    // Init SPI NSS
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_NSS;
+    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_OUTPUT;
+    GPIO_Init(&gpioHandle);
+    GPIO_WriteToOutputPin(GPIOB, SPI_NSS, ENABLE);
+
     // Init SPI
     SPI_PeriClockControl(spiHandle.pSPIx, ENABLE);
     SPI_Init(&spiHandle);
@@ -92,7 +94,11 @@ int main(void) {
     while (1) {
         if (button_trigger) {
             uint8_t data = 10;
-            SPI_SendDataIT(&spiHandle, &data, 1);
+            SPI_SlaveSelect(&spiHandle, GPIOB, SPI_NSS);
+            SPI_SendData(&spiHandle, &data, 1);
+            // Optional interrupt method (does not support BUSY flag check)
+            // SPI_SendDataIT(&spiHandle, &data, 1);
+            SPI_SlaveDeSelect(&spiHandle, GPIOB, SPI_NSS);
             button_trigger = 0;
         }
         // Disable the SPI peripheral after 3 transmits
@@ -105,7 +111,7 @@ int main(void) {
 
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
-    trigger_count += 1;
+    // trigger_count += 1;
     button_trigger = 1;
 }
 
