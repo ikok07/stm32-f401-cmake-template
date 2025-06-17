@@ -32,10 +32,17 @@
                                                         I2C1_EV_IRQn)
 
 /**
+ * @brief Returns the maximum rise time for both SDA and SCL signals
+ * @param speed The speed of the I2C peripheral
+ */
+#define I2C_MAX_TRISE_NS_FOR_SPEED(speed)                  (speed <= I2C_SCL_SPEED_SM ? 1000 : 300)
+
+/**
  * @I2C_SCLSpeed
  */
 #define I2C_SCL_SPEED_SM                100000
 #define I2C_SCL_SPEED_FM2K              200000
+#define I2C_SCL_SPEED_FM3K              300000
 #define I2C_SCL_SPEED_FM4K              400000
 
 /**
@@ -43,12 +50,6 @@
  */
 #define I2C_DEVICE_ADDR_7_BITS          0
 #define I2C_DEVICE_ADDR_10_BITS         1
-
-/**
- * @I2C_ACKControl
- */
-#define I2C_ACK_DISABLE                 0
-#define I2C_ACK_ENABLE                  1
 
 /**
  * @I2C_FMDutyCycle
@@ -62,11 +63,15 @@
 #define I2C_RESET_DISABLED              0
 #define I2C_RESET_ENABLED               1
 
+/**
+ * @I2C_DisableStart
+ */
+#define I2C_START_ENABLED               0
+#define I2C_START_DISABLED              1
 typedef struct {
     uint32_t I2C_SCLSpeed;                      /** Possible values from @I2C_SCLSpeed */
     uint8_t I2C_DeviceAddress;
     uint8_t I2C_DeviceAddressLen;               /** Possible values from @I2C_DeviceAddressLen */
-    uint8_t I2C_ACKControl;                     /** Possible values from @I2C_ACKControl */
     uint16_t I2C_FMDutyCycle;                   /** Possible values from @I2C_FMDutyCycle */
 } I2C_Config_t;
 
@@ -90,7 +95,8 @@ void I2C_DeInit(I2C_TypeDef *pI2Cx);
 /*
  * Data send and receive
  */
-uint8_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr);
+uint8_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
+uint8_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
 
 /*
  * Other controls

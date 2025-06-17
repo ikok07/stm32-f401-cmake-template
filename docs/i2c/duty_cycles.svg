@@ -1,0 +1,103 @@
+<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="600" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="400" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#333">I2C SCL Clock Duty Cycles</text>
+  
+  <!-- Standard Mode (50% duty cycle) -->
+  <text x="50" y="80" font-size="16" font-weight="bold" fill="#333">Standard Mode (100 KHz) - 50% Duty Cycle</text>
+  
+  <!-- Grid lines for Standard Mode -->
+  <g stroke="#e0e0e0" stroke-width="1">
+    <line x1="50" y1="100" x2="750" y2="100"/>
+    <line x1="50" y1="150" x2="750" y2="150"/>
+  </g>
+  
+  <!-- Standard Mode Waveform -->
+  <g stroke="#2563eb" stroke-width="3" fill="none">
+    <path d="M 50 150 L 50 100 L 200 100 L 200 150 L 350 150 L 350 100 L 500 100 L 500 150 L 650 150 L 650 100 L 750 100"/>
+  </g>
+  
+  <!-- Standard Mode Labels -->
+  <text x="125" y="80" text-anchor="middle" font-size="12" fill="#666">T_high = 5μs</text>
+  <text x="275" y="170" text-anchor="middle" font-size="12" fill="#666">T_low = 5μs</text>
+  <text x="200" y="190" text-anchor="middle" font-size="12" fill="#333">Period = 10μs (100 KHz)</text>
+  
+  <!-- Arrows for Standard Mode -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+  </defs>
+  
+  <g stroke="#666" stroke-width="1" marker-end="url(#arrowhead)">
+    <line x1="50" y1="180" x2="200" y2="180"/>
+    <line x1="200" y1="180" x2="350" y2="180"/>
+  </g>
+  
+  <!-- Fast Mode DUTY = 0 (t_low/t_high = 2) -->
+  <text x="50" y="250" font-size="16" font-weight="bold" fill="#333">Fast Mode DUTY = 0 - t_low/t_high = 2</text>
+  
+  <!-- Grid lines for Fast Mode DUTY = 0 -->
+  <g stroke="#e0e0e0" stroke-width="1">
+    <line x1="50" y1="270" x2="750" y2="270"/>
+    <line x1="50" y1="320" x2="750" y2="320"/>
+  </g>
+  
+  <!-- Fast Mode DUTY = 0 Waveform -->
+  <g stroke="#dc2626" stroke-width="3" fill="none">
+    <path d="M 50 320 L 50 270 L 150 270 L 150 320 L 350 320 L 350 270 L 450 270 L 450 320 L 650 320 L 650 270 L 750 270"/>
+  </g>
+  
+  <!-- Fast Mode DUTY = 0 Labels -->
+  <text x="100" y="250" text-anchor="middle" font-size="12" fill="#666">T_high = 0.83μs</text>
+  <text x="250" y="340" text-anchor="middle" font-size="12" fill="#666">T_low = 1.67μs</text>
+  <text x="250" y="360" text-anchor="middle" font-size="12" fill="#333">Period = 2.5μs (400 KHz)</text>
+  
+  <!-- Arrows for Fast Mode DUTY = 0 -->
+  <g stroke="#666" stroke-width="1" marker-end="url(#arrowhead)">
+    <line x1="50" y1="350" x2="150" y2="350"/>
+    <line x1="150" y1="350" x2="350" y2="350"/>
+  </g>
+  
+  <!-- Fast Mode DUTY = 1 (16/9 ratio) -->
+  <text x="50" y="420" font-size="16" font-weight="bold" fill="#333">Fast Mode DUTY = 1 - t_low/t_high = 16/9</text>
+  
+  <!-- Grid lines for Fast Mode DUTY = 1 -->
+  <g stroke="#e0e0e0" stroke-width="1">
+    <line x1="50" y1="440" x2="750" y2="440"/>
+    <line x1="50" y1="490" x2="750" y2="490"/>
+  </g>
+  
+  <!-- Fast Mode DUTY = 1 Waveform -->
+  <g stroke="#059669" stroke-width="3" fill="none">
+    <path d="M 50 490 L 50 440 L 140 440 L 140 490 L 300 490 L 300 440 L 390 440 L 390 490 L 550 490 L 550 440 L 640 440 L 640 490 L 750 490"/>
+  </g>
+  
+  <!-- Fast Mode DUTY = 1 Labels -->
+  <text x="95" y="420" text-anchor="middle" font-size="12" fill="#666">T_high = 0.9μs</text>
+  <text x="220" y="510" text-anchor="middle" font-size="12" fill="#666">T_low = 1.6μs</text>
+  <text x="220" y="530" text-anchor="middle" font-size="12" fill="#333">Period = 2.5μs (400 KHz)</text>
+  
+  <!-- Arrows for Fast Mode DUTY = 1 -->
+  <g stroke="#666" stroke-width="1" marker-end="url(#arrowhead)">
+    <line x1="50" y1="520" x2="140" y2="520"/>
+    <line x1="140" y1="520" x2="300" y2="520"/>
+  </g>
+  
+  <!-- Formula Box -->
+  <rect x="450" y="380" width="280" height="180" fill="#f0f9ff" stroke="#3b82f6" stroke-width="2" rx="5"/>
+  <text x="590" y="405" text-anchor="middle" font-size="14" font-weight="bold" fill="#333">STM32 I2C Formulas</text>
+  
+  <text x="460" y="430" font-size="12" fill="#333">Standard Mode:</text>
+  <text x="460" y="445" font-size="11" fill="#666">T_high = T_low = CCR × T_PCLK</text>
+  
+  <text x="460" y="470" font-size="12" fill="#333">Fast Mode DUTY = 0:</text>
+  <text x="460" y="485" font-size="11" fill="#666">T_high = CCR × T_PCLK</text>
+  <text x="460" y="500" font-size="11" fill="#666">T_low = 2 × CCR × T_PCLK</text>
+  
+  <text x="460" y="525" font-size="12" fill="#333">Fast Mode DUTY = 1:</text>
+  <text x="460" y="540" font-size="11" fill="#666">T_high = 9 × CCR × T_PCLK</text>
+  <text x="460" y="555" font-size="11" fill="#666">T_low = 16 × CCR × T_PCLK</text>
+</svg>

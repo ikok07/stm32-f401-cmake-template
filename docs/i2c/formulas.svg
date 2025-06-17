@@ -1,0 +1,100 @@
+<svg width="800" height="520" xmlns="http://www.w3.org/2000/svg">
+    <style>
+        text {
+        font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+        fill: #333;
+        }
+        .header {
+        font-size: 22px;
+        font-weight: bold;
+        fill: #0055aa;
+        }
+        .formula {
+        font-size: 16px;
+        }
+        .legend-title {
+        font-size: 18px;
+        font-weight: bold;
+        fill: #444;
+        }
+        .legend {
+        font-size: 14px;
+        }
+        .note {
+        font-size: 13px;
+        fill: #555;
+        font-style: italic;
+        }
+    </style>
+
+    <!-- Background -->
+    <rect width="100%" height="100%" fill="white"/>
+
+    <!-- Title -->
+    <text x="20" y="30" class="header">📘 I²C Signal Timing &amp; Pull-up Formulas</text>
+
+    <!-- Formulas -->
+    <text x="40" y="70" class="formula">
+        1. CCR = R<tspan baseline-shift="sub" font-size="12">pullup</tspan> × C<tspan baseline-shift="sub" font-size="12">bus</tspan>
+    </text>
+    <text x="40" y="100" class="formula">
+        2. t<tspan baseline-shift="sub" font-size="12">rise</tspan> ≈ 2.2 × CCR
+    </text>
+    <text x="40" y="130" class="formula">
+        3. I<tspan baseline-shift="sub" font-size="12">pullup</tspan> = V<tspan baseline-shift="sub" font-size="12">cc</tspan> / R<tspan baseline-shift="sub" font-size="12">pullup</tspan>
+    </text>
+    <text x="40" y="160" class="formula">
+        4. R<tspan baseline-shift="sub" font-size="12">p max</tspan> = t<tspan baseline-shift="sub" font-size="12">rise</tspan> / (0.8473 × C<tspan baseline-shift="sub" font-size="12">bus</tspan>)
+    </text>
+    <text x="40" y="190" class="formula">
+        5. R<tspan baseline-shift="sub" font-size="12">p min</tspan> = (V<tspan baseline-shift="sub" font-size="12">dd</tspan> - V<tspan baseline-shift="sub" font-size="12">OL max</tspan>) / I<tspan baseline-shift="sub" font-size="12">OL</tspan>
+    </text>
+
+    <!-- Notes -->
+    <text x="40" y="230" class="header">📝 Notes:</text>
+    <text x="60" y="260" class="formula">
+        • Max t<tspan baseline-shift="sub" font-size="12">rise</tspan>: 1000 ns (Standard Mode), 300 ns (Fast Mode)
+    </text>
+    <text x="60" y="290" class="formula">
+        • Typical R<tspan baseline-shift="sub" font-size="12">pullup</tspan>: 10kΩ → 4.7kΩ (standard), down to 2.2kΩ (fast)
+    </text>
+    <text x="60" y="320" class="formula">
+        • Estimate C<tspan baseline-shift="sub" font-size="12">bus</tspan> ≈ 10–400 pF (traces + devices)
+    </text>
+    <text x="40" y="360" class="note">
+        Maximum Pull-up Resistor Value (R<tspan baseline-shift="sub" font-size="10">p max</tspan>) limits the signal rise time and bus capacitance.
+    </text>
+    <text x="40" y="380" class="note">
+        Minimum Pull-up Resistor Value (R<tspan baseline-shift="sub" font-size="10">p min</tspan>) ensures devices can pull the line low within voltage and current specs.
+    </text>
+
+    <!-- Legend -->
+    <text x="500" y="70" class="legend-title">📗 Legend:</text>
+    <text x="520" y="100" class="legend">
+        CCR – Channel Capacitance × Resistance (s)
+    </text>
+    <text x="520" y="120" class="legend">
+        t<tspan baseline-shift="sub" font-size="10">rise</tspan> – Rise time of SDA/SCL signal
+    </text>
+    <text x="520" y="140" class="legend">
+        R<tspan baseline-shift="sub" font-size="10">pullup</tspan> – Pull-up resistor (Ω)
+    </text>
+    <text x="520" y="160" class="legend">
+        C<tspan baseline-shift="sub" font-size="10">bus</tspan> – Total bus capacitance (F)
+    </text>
+    <text x="520" y="180" class="legend">
+        V<tspan baseline-shift="sub" font-size="10">cc</tspan> – Supply voltage (e.g. 3.3V or 5V)
+    </text>
+    <text x="520" y="200" class="legend">
+        I<tspan baseline-shift="sub" font-size="10">pullup</tspan> – Current through pull-up resistor
+    </text>
+    <text x="520" y="220" class="legend">
+        V<tspan baseline-shift="sub" font-size="10">OL max</tspan> – Max low-level output voltage
+    </text>
+    <text x="520" y="240" class="legend">
+        I<tspan baseline-shift="sub" font-size="10">OL</tspan> – Low-level output current sink
+    </text>
+    <text x="520" y="260" class="legend">
+        R<tspan baseline-shift="sub" font-size="10">p max/min</tspan> – Pull-up resistor max/min values
+    </text>
+</svg>

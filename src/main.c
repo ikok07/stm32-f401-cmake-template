@@ -1,44 +1,25 @@
-#include <spi_driver.h>
+#include <i2c_driver.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "stm32f4xx.h"
 #include "gpio_driver.h"
 
 /*
- * SPI GPIOs:
- * NSS      =>  PB9
- * SCK      =>  PB10
- * MISO     =>  PB14
- * MOSI     =>  PB15
+ * I2C GPIOs:
+ * SDA      =>  PB7
+ * SCL      =>  PB8
 */
 
 #define LED_PIN             13
 #define BTN_PIN             0
 
-#define SPI_NSS             9
-#define SPI_SCK             10
-#define SPI_MISO            14
-#define SPI_MOSI            15
+#define I2C_SDA             7
+#define I2C_SCL             8
+
+#define SLAVE_ADDR          0x03
 
 volatile uint8_t button_trigger = 0;
-volatile uint8_t trigger_count = 0;
-
-SPI_Handle_t spiHandle = {
-    .pSPIx = SPI2,
-    .SPIConfig = {
-        .SPI_DeviceMode = SPI_DEVICE_MODE_MASTER,
-        .SPI_BusConfig = SPI_BUS_CFG_FULL_DUPLEX,
-        .SPI_DF = SPI_DF_8BITS,
-        .SPI_SclkSpeed = SPI_SCLK_SPEED_DIV256,
-        .SPI_BitsOrder = SPI_BO_MSBFIRST,
-        .SPI_FrameFormat = SPI_FF_MOTOROLA,
-        .SPI_SSM = SPI_SSM_SW,
-        .SPI_CPHA = SPI_CPHA_1EDGE,
-        .SPI_CPOL = SPI_CPOL_LOW,
-        .SPI_SS_ActiveLevel = SPI_SS_LOW,
-        .SPI_SS_OutputEnabled = SPI_SS_OUTPUT_ENABLED
-    }
-};
 
 int main(void) {
     GPIO_Handle_t gpioHandle = {
@@ -49,6 +30,16 @@ int main(void) {
             .GPIO_PinOPType = GPIO_OP_TYPE_PP,
             .GPIO_PinPuPdControl = GPIO_NO_PUPD,
             .GPIO_PinSpeed = GPIO_SPEED_HIGH
+        }
+    };
+
+    I2C_Handle_t i2cHandle = {
+        .pI2Cx = I2C1,
+        .I2C_Config = {
+            .I2C_SCLSpeed = I2C_SCL_SPEED_SM,
+            .I2C_DeviceAddressLen = I2C_DEVICE_ADDR_7_BITS,
+            .I2C_DeviceAddress = 0x01,
+            .I2C_FMDutyCycle = I2C_FM_DUTY_2
         }
     };
 
@@ -63,74 +54,54 @@ int main(void) {
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
-    // Init SPI SCK
+    // Init I2C SCL
     gpioHandle.pGPIOx = GPIOB;
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_SCK;
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SCL;
     gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_ALTERNATE;
     gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NO_PUPD;
-    gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF5;
+    gpioHandle.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_OD;
+    gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF4;
     GPIO_Init(&gpioHandle);
 
-    // Init SPI MISO
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_MISO;
+    // Init I2C SDA
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SDA;
     GPIO_Init(&gpioHandle);
 
-    // Init SPI MOSI
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_MOSI;
-    GPIO_Init(&gpioHandle);
-
-    // Init SPI NSS
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = SPI_NSS;
-    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_OUTPUT;
-    GPIO_Init(&gpioHandle);
-    GPIO_WriteToOutputPin(GPIOB, SPI_NSS, ENABLE);
-
-    // Init SPI
-    SPI_PeriClockControl(spiHandle.pSPIx, ENABLE);
-    SPI_Init(&spiHandle);
-    SPI_IRQConfig(2, 15, ENABLE);
-    SPI_PeripheralControl(&spiHandle, ENABLE);
+    // Init I2C
+    I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
+    I2C_Init(&i2cHandle);
 
     while (1) {
         if (button_trigger) {
-            uint8_t data = 10;
-            SPI_SlaveSelect(&spiHandle, GPIOB, SPI_NSS);
-            SPI_SendData(&spiHandle, &data, 1);
-            // Optional interrupt method (does not support BUSY flag check)
-            // SPI_SendDataIT(&spiHandle, &data, 1);
-            SPI_SlaveDeSelect(&spiHandle, GPIOB, SPI_NSS);
+            // Small delay because of debouncing
+            for (int i = 0; i < 1000000; i++);
+
+            // uint8_t tx_data[16] = "Hello, World!";
+            uint8_t command = 0x51;
+            uint8_t length = 0;
+
+            GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+            I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
+
+            // Get the length
+            I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_START_DISABLED);
+            I2C_MasterReceiveData(&i2cHandle, &length, sizeof(length), SLAVE_ADDR, I2C_START_DISABLED);
+
+            // Receive the data
+            uint8_t rx_data[length];
+            if (length > 0) {
+                command = 0x52;
+                I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_START_DISABLED);
+                I2C_MasterReceiveData(&i2cHandle, rx_data, sizeof(rx_data), SLAVE_ADDR, I2C_START_ENABLED);
+            }
+
+            I2C_PeripheralControl(i2cHandle.pI2Cx, DISABLE);
             button_trigger = 0;
-        }
-        // Disable the SPI peripheral after 3 transmits
-        else if (trigger_count == 4) {
-            SPI_PeripheralControl(&spiHandle, DISABLE);
-            SPI_DeInit(spiHandle.pSPIx);
         }
     };
 }
 
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
-    // trigger_count += 1;
     button_trigger = 1;
-}
-
-void SPI2_IRQHandler() {
-    IRQ_Handling(&spiHandle);
-}
-
-void SPI_ApplicationEventCallback(SPI_Handle_t *pSPIHandle, uint8_t AppEvent) {
-    switch (AppEvent) {
-        case SPI_EVENT_TX_COMPLETE:
-            GPIO_ToggleOutputPin(GPIOC, LED_PIN);
-        break;
-        case SPI_EVENT_RX_COMPLETE:
-            // ...
-        break;
-        case SPI_EVENT_OVR_ERR_COMPLETE:
-            // ...
-        break;
-        default:
-            // ...
-    }
 }
