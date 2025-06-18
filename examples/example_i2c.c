@@ -1,3 +1,7 @@
+//
+// Created by Kok on 6/18/25.
+//
+
 #include <i2c_driver.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,18 +25,6 @@
 
 volatile uint8_t button_trigger = 0;
 
-uint8_t command = 0x51;
-
-I2C_Handle_t i2cHandle = {
-    .pI2Cx = I2C1,
-    .I2C_Config = {
-        .I2C_SCLSpeed = I2C_SCL_SPEED_SM,
-        .I2C_DeviceAddressLen = I2C_DEVICE_ADDR_7_BITS,
-        .I2C_DeviceAddress = 0x01,
-        .I2C_FMDutyCycle = I2C_FM_DUTY_2
-    }
-};
-
 int main(void) {
     GPIO_Handle_t gpioHandle = {
         .pGPIOx = GPIOC,
@@ -42,6 +34,16 @@ int main(void) {
             .GPIO_PinOPType = GPIO_OP_TYPE_PP,
             .GPIO_PinPuPdControl = GPIO_NO_PUPD,
             .GPIO_PinSpeed = GPIO_SPEED_HIGH
+        }
+    };
+
+    I2C_Handle_t i2cHandle = {
+        .pI2Cx = I2C1,
+        .I2C_Config = {
+            .I2C_SCLSpeed = I2C_SCL_SPEED_SM,
+            .I2C_DeviceAddressLen = I2C_DEVICE_ADDR_7_BITS,
+            .I2C_DeviceAddress = 0x01,
+            .I2C_FMDutyCycle = I2C_FM_DUTY_2
         }
     };
 
@@ -72,19 +74,32 @@ int main(void) {
     // Init I2C
     I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
     I2C_Init(&i2cHandle);
-    I2C_IRQConfig(I2C_INDEX_1, 15, ENABLE);
-    I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
 
     while (1) {
         if (button_trigger) {
             // Small delay because of debouncing
             for (int i = 0; i < 1000000; i++);
 
+            // uint8_t tx_data[16] = "Hello, World!";
+            uint8_t command = 0x51;
+            uint8_t length = 0;
+
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+            I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
 
-            // I2C_MasterSendDataIT(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_START_ENABLED);
-            // I2C_MasterReceiveDataIT(&i2cHandle, buffer, sizeof(buffer), SLAVE_ADDR, I2C_STOP_ENABLED);
+            // Get the length
+            I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_START_DISABLED);
+            I2C_MasterReceiveData(&i2cHandle, &length, sizeof(length), SLAVE_ADDR, I2C_START_DISABLED);
 
+            // Receive the data
+            uint8_t rx_data[length];
+            if (length > 0) {
+                command = 0x52;
+                I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_START_DISABLED);
+                I2C_MasterReceiveData(&i2cHandle, rx_data, sizeof(rx_data), SLAVE_ADDR, I2C_START_ENABLED);
+            }
+
+            I2C_PeripheralControl(i2cHandle.pI2Cx, DISABLE);
             button_trigger = 0;
         }
     };
@@ -93,21 +108,4 @@ int main(void) {
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
     button_trigger = 1;
-}
-
-void I2C1_EV_IRQHandler() {
-    I2C_IRQEventHandling(&i2cHandle);
-}
-
-void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEvent) {
-    if (pI2CHandle->pI2Cx == I2C1) {
-        switch (AppEvent) {
-            case I2C_EVENT_TX_COMPLETE:
-                break;
-            case I2C_EVENT_RX_COMPLETE:
-                break;
-            default:
-                break;
-        }
-    }
 }

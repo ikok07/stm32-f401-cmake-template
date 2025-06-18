@@ -38,6 +38,13 @@
 #define I2C_MAX_TRISE_NS_FOR_SPEED(speed)                  (speed <= I2C_SCL_SPEED_SM ? 1000 : 300)
 
 /**
+ * @I2C_PerIndex
+ */
+#define I2C_INDEX_1                     1
+#define I2C_INDEX_2                     2
+#define I2C_INDEX_3                     3
+
+/**
  * @I2C_SCLSpeed
  */
 #define I2C_SCL_SPEED_SM                100000
@@ -64,10 +71,24 @@
 #define I2C_RESET_ENABLED               1
 
 /**
- * @I2C_DisableStart
+ * @I2C_DisableStop
  */
-#define I2C_START_ENABLED               0
-#define I2C_START_DISABLED              1
+#define I2C_STOP_ENABLED               0
+#define I2C_STOP_DISABLED              1
+
+/**
+ * @I2C_TxRxState
+ */
+#define I2C_READY                       0
+#define I2C_RX_BUSY                     1
+#define I2C_TX_BUSY                     2
+
+/**
+ * @I2C_Evemt
+ */
+#define I2C_EVENT_TX_COMPLETE               0
+#define I2C_EVENT_RX_COMPLETE               1
+
 typedef struct {
     uint32_t I2C_SCLSpeed;                      /** Possible values from @I2C_SCLSpeed */
     uint8_t I2C_DeviceAddress;
@@ -76,9 +97,22 @@ typedef struct {
 } I2C_Config_t;
 
 typedef struct {
+    uint8_t *pTXBuffer;
+    uint8_t *pRXBuffer;
+    uint32_t TxLen;
+    uint32_t RxLen;
+    uint32_t RxLenOriginal;
+    uint8_t TxRxState;                          /** Possible values from @I2C_TxRxState */
+    uint8_t DevAddr;                            // Slave device address
+    uint8_t DisableStop;                        /** Possible values from @I2C_DisableStop (Indicates if repeated start is enabled) */
+    uint8_t WriteEnabled;                       // Indicates if the next operation should be WRITE or READ
+} I2C_ITState_t;
+
+typedef struct {
     I2C_TypeDef *pI2Cx;
     I2C_Config_t I2C_Config;
     uint8_t I2C_ResetState;                     /** Possible values from @I2C_ResetState */
+    I2C_ITState_t I2C_ITState;                  // Used when using interrupts
 } I2C_Handle_t;
 
 /*
@@ -98,6 +132,9 @@ void I2C_DeInit(I2C_TypeDef *pI2Cx);
 uint8_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
 uint8_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
 
+uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
+uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
+
 /*
  * Other controls
  */
@@ -109,6 +146,7 @@ void I2C_SetResetState(I2C_Handle_t *pI2CHandle, uint8_t Enable);
  * IRQ Configuration
  */
 void I2C_IRQConfig(uint8_t PerIndex, uint8_t IRQPriority, uint8_t Enable);
+void I2C_IRQEventHandling(I2C_Handle_t *pI2CHandle);
 
 /*
  * Application callback

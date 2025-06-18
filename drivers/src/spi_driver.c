@@ -482,6 +482,7 @@ void IRQ_Handling(SPI_Handle_t *pSPIHandle) {
         pSPIHandle->pSPIx->CR2 & (1 << SPI_CR2_TXEIE_Pos)
     ) {
         spi_txe_interrupt_handler(pSPIHandle);
+        return;
     }
 
     // Check for RXNE flag
@@ -490,6 +491,7 @@ void IRQ_Handling(SPI_Handle_t *pSPIHandle) {
         pSPIHandle->pSPIx->CR2 & (1 << SPI_CR2_RXNEIE_Pos)
     ) {
         spi_rxne_interrupt_handler(pSPIHandle);
+        return;
     }
 
     // Check for OVR flag
@@ -498,6 +500,7 @@ void IRQ_Handling(SPI_Handle_t *pSPIHandle) {
         pSPIHandle->pSPIx->CR2 & (1 << SPI_CR2_ERRIE_Pos)
     ) {
         spi_ovr_err_interrupt_handler(pSPIHandle);
+        return;
     }
 }
 
