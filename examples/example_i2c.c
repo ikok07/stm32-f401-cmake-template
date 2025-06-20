@@ -84,20 +84,21 @@ int main(void) {
             uint8_t command = 0x51;
             uint8_t length = 0;
 
-            GPIO_ToggleOutputPin(GPIOC, LED_PIN);
             I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
 
             // Get the length
-            I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_START_DISABLED);
-            I2C_MasterReceiveData(&i2cHandle, &length, sizeof(length), SLAVE_ADDR, I2C_START_DISABLED);
+            I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_STOP_DISABLED);
+            I2C_MasterReceiveData(&i2cHandle, &length, sizeof(length), SLAVE_ADDR, I2C_STOP_DISABLED);
 
             // Receive the data
             uint8_t rx_data[length];
             if (length > 0) {
                 command = 0x52;
-                I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_START_DISABLED);
-                I2C_MasterReceiveData(&i2cHandle, rx_data, sizeof(rx_data), SLAVE_ADDR, I2C_START_ENABLED);
+                I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_STOP_DISABLED);
+                I2C_MasterReceiveData(&i2cHandle, rx_data, sizeof(rx_data), SLAVE_ADDR, I2C_STOP_ENABLED);
             }
+
+            if (rx_data[3] == 4) GPIO_ToggleOutputPin(GPIOC, LED_PIN);
 
             I2C_PeripheralControl(i2cHandle.pI2Cx, DISABLE);
             button_trigger = 0;

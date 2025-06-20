@@ -84,10 +84,19 @@
 #define I2C_TX_BUSY                     2
 
 /**
- * @I2C_Evemt
+ * @I2C_Event
  */
 #define I2C_EVENT_TX_COMPLETE               0
 #define I2C_EVENT_RX_COMPLETE               1
+#define I2C_EVENT_DATA_REQUEST              2   // when the slave sends data to master
+#define I2C_EVENT_DATA_RECEIVE              3   // when the master sends data to the slave
+#define I2C_EVENT_MASTER_DATA_REQUEST       4
+#define I2C_EVENT_STOP                      5
+#define I2C_EVENT_BUS_ERROR                 6
+#define I2C_EVENT_ARB_LOST                  7
+#define I2C_EVENT_NACK                      8
+#define I2C_EVENT_OVR                       9
+#define I2C_EVENT_TIMEOUT                   10
 
 typedef struct {
     uint32_t I2C_SCLSpeed;                      /** Possible values from @I2C_SCLSpeed */
@@ -104,7 +113,6 @@ typedef struct {
     uint32_t RxLenOriginal;
     uint8_t TxRxState;                          /** Possible values from @I2C_TxRxState */
     uint8_t DevAddr;                            // Slave device address
-    uint8_t DisableStop;                        /** Possible values from @I2C_DisableStop (Indicates if repeated start is enabled) */
     uint8_t WriteEnabled;                       // Indicates if the next operation should be WRITE or READ
 } I2C_ITState_t;
 
@@ -132,8 +140,11 @@ void I2C_DeInit(I2C_TypeDef *pI2Cx);
 uint8_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
 uint8_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
 
-uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
-uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, uint8_t DisableStop);
+uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr);
+uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr);
+
+uint8_t I2C_SlaveSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t data);
+uint8_t I2C_SlaveReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer);
 
 /*
  * Other controls
@@ -147,6 +158,7 @@ void I2C_SetResetState(I2C_Handle_t *pI2CHandle, uint8_t Enable);
  */
 void I2C_IRQConfig(uint8_t PerIndex, uint8_t IRQPriority, uint8_t Enable);
 void I2C_IRQEventHandling(I2C_Handle_t *pI2CHandle);
+void I2C_IRQErrorHandling(I2C_Handle_t *pI2CHandle);
 
 /*
  * Application callback
