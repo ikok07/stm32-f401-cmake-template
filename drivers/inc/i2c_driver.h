@@ -100,7 +100,7 @@
 
 typedef struct {
     uint32_t I2C_SCLSpeed;                      /** Possible values from @I2C_SCLSpeed */
-    uint8_t I2C_DeviceAddress;
+    uint16_t I2C_DeviceAddress;
     uint8_t I2C_DeviceAddressLen;               /** Possible values from @I2C_DeviceAddressLen */
     uint16_t I2C_FMDutyCycle;                   /** Possible values from @I2C_FMDutyCycle */
 } I2C_Config_t;
@@ -143,6 +143,7 @@ uint8_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint
 uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr);
 uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr);
 
+uint8_t I2C_SlaveConfigure(I2C_Handle_t *pI2CHandle);
 uint8_t I2C_SlaveSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t data);
 uint8_t I2C_SlaveReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer);
 
@@ -151,6 +152,7 @@ uint8_t I2C_SlaveReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer);
  */
 uint8_t I2C_PeripheralEnabled(I2C_TypeDef *pI2Cx);
 void I2C_PeripheralControl(I2C_TypeDef *pI2Cx, uint8_t Enable);
+void I2C_AcknowledgeControl(I2C_TypeDef *pI2Cx, uint8_t Enabled);
 void I2C_SetResetState(I2C_Handle_t *pI2CHandle, uint8_t Enable);
 
 /*
