@@ -40,10 +40,10 @@ int main(void) {
     I2C_Handle_t i2cHandle = {
         .pI2Cx = I2C1,
         .I2C_Config = {
-            .I2C_SCLSpeed = I2C_SCL_SPEED_SM,
-            .I2C_DeviceAddressLen = I2C_DEVICE_ADDR_7_BITS,
+            .I2C_SCLSpeed = I2C_SclSpeedSM,
+            .I2C_DeviceAddressLen = I2C_DeviceAddr7Bits,
             .I2C_DeviceAddress = 0x01,
-            .I2C_FMDutyCycle = I2C_FM_DUTY_2
+            .I2C_FMDutyCycle = I2C_FmDuty2
         }
     };
 
@@ -87,15 +87,15 @@ int main(void) {
             I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
 
             // Get the length
-            I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_STOP_DISABLED);
-            I2C_MasterReceiveData(&i2cHandle, &length, sizeof(length), SLAVE_ADDR, I2C_STOP_DISABLED);
+            I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_StopDisabled);
+            I2C_MasterReceiveData(&i2cHandle, &length, sizeof(length), SLAVE_ADDR, I2C_StopDisabled);
 
             // Receive the data
             uint8_t rx_data[length];
             if (length > 0) {
                 command = 0x52;
-                I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_STOP_DISABLED);
-                I2C_MasterReceiveData(&i2cHandle, rx_data, sizeof(rx_data), SLAVE_ADDR, I2C_STOP_ENABLED);
+                I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_StopDisabled);
+                I2C_MasterReceiveData(&i2cHandle, rx_data, sizeof(rx_data), SLAVE_ADDR, I2C_StopEnabled);
             }
 
             if (rx_data[3] == 4) GPIO_ToggleOutputPin(GPIOC, LED_PIN);

@@ -2,9 +2,7 @@
 // Created by Kok on 6/21/25.
 //
 
-
 #include <i2c_driver.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "stm32f4xx.h"
@@ -33,10 +31,10 @@ uint8_t err;
 I2C_Handle_t i2cHandle = {
     .pI2Cx = I2C1,
     .I2C_Config = {
-        .I2C_SCLSpeed = I2C_SCL_SPEED_SM,
-        .I2C_DeviceAddressLen = I2C_DEVICE_ADDR_7_BITS,
+        .I2C_SCLSpeed = I2C_SclSpeedSM,
+        .I2C_DeviceAddressLen = I2C_DeviceAddr7Bits,
         .I2C_DeviceAddress = CURR_ADDR,
-        .I2C_FMDutyCycle = I2C_FM_DUTY_2
+        .I2C_FMDutyCycle = I2C_FmDuty2
     }
 };
 
@@ -79,7 +77,7 @@ int main(void) {
     // Init I2C
     I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
     I2C_Init(&i2cHandle);
-    I2C_SlaveConfigure(&i2cHandle);
+    I2C_SlaveConfigure(I2C_Index_1, &i2cHandle);
 
     while (1) {
         if (button_trigger) {
@@ -109,11 +107,11 @@ void I2C1_ER_IRQHandler() {
 void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEvent) {
     if (pI2CHandle->pI2Cx == I2C1) {
         switch (AppEvent) {
-            case I2C_EVENT_DATA_REQUEST:
+            case I2C_EventDataRequest:
                 if (tx_buffer_index == 4) tx_buffer_index = 0;
                 I2C_SlaveSendDataIT(pI2CHandle, tx_buffer[tx_buffer_index++]);
                 break;
-            case I2C_EVENT_NACK:
+            case I2C_EventNACK:
                 GPIO_ToggleOutputPin(GPIOC, LED_PIN);
                 break;
             // Other events...

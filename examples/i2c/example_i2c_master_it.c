@@ -3,7 +3,6 @@
 //
 
 #include <i2c_driver.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "stm32f4xx.h"
@@ -29,10 +28,10 @@ uint8_t err;
 I2C_Handle_t i2cHandle = {
     .pI2Cx = I2C1,
     .I2C_Config = {
-        .I2C_SCLSpeed = I2C_SCL_SPEED_SM,
-        .I2C_DeviceAddressLen = I2C_DEVICE_ADDR_7_BITS,
+        .I2C_SCLSpeed = I2C_SclSpeedSM,
+        .I2C_DeviceAddressLen = I2C_DeviceAddr7Bits,
         .I2C_DeviceAddress = 0x01,
-        .I2C_FMDutyCycle = I2C_FM_DUTY_2
+        .I2C_FMDutyCycle = I2C_FmDuty2
     }
 };
 
@@ -75,7 +74,7 @@ int main(void) {
     // Init I2C
     I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
     I2C_Init(&i2cHandle);
-    I2C_IRQConfig(I2C_INDEX_1, 15, ENABLE);
+    I2C_IRQConfig(I2C_Index_1, 15, ENABLE);
     I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
 
     while (1) {
@@ -88,11 +87,11 @@ int main(void) {
 
             err = I2C_MasterSendDataIT(&i2cHandle, &command, sizeof(command), SLAVE_ADDR);
             if (err != 0) continue;
-            while (i2cHandle.I2C_ITState.TxRxState != I2C_READY);
+            while (i2cHandle.I2C_ITState.TxRxState != I2C_Ready);
 
             err = I2C_MasterReceiveDataIT(&i2cHandle, &length, sizeof(length), SLAVE_ADDR);
             if (err != 0) continue;
-            while (i2cHandle.I2C_ITState.TxRxState != I2C_READY);
+            while (i2cHandle.I2C_ITState.TxRxState != I2C_Ready);
 
             command = 0x52;
             uint8_t buffer[length];
@@ -102,14 +101,14 @@ int main(void) {
                 button_trigger = 0;
                 continue;
             }
-            while (i2cHandle.I2C_ITState.TxRxState != I2C_READY);
+            while (i2cHandle.I2C_ITState.TxRxState != I2C_Ready);
 
             err = I2C_MasterReceiveDataIT(&i2cHandle, buffer, length, SLAVE_ADDR);
             if (err != 0) {
                 button_trigger = 0;
                 continue;
             }
-            while (i2cHandle.I2C_ITState.TxRxState != I2C_READY);
+            while (i2cHandle.I2C_ITState.TxRxState != I2C_Ready);
 
             if (buffer[3] == 4) GPIO_ToggleOutputPin(GPIOC, LED_PIN);
 
@@ -134,15 +133,11 @@ void I2C1_ER_IRQHandler() {
 void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEvent) {
     if (pI2CHandle->pI2Cx == I2C1) {
         switch (AppEvent) {
-            case I2C_EVENT_TX_COMPLETE:
+            case I2C_EventTxComplete:
                 break;
-            case I2C_EVENT_RX_COMPLETE:
-                break;
-            case I2C_EVENT_STOP:
+            case I2C_EventRxComplete:
                 break;
             // Other events...
-            case I2C_EVENT_TIMEOUT:
-                break;
             default:
                 break;
         }

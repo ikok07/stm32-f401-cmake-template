@@ -40,7 +40,7 @@ set (PROJECT_TYPE             "exe")
 set (LINKER_SCRIPT            "../STM32F401CCUX_FLASH.ld")
 set (MCPU                     "-mcpu=Cortex-M4")
 set (MFPU                 "-mfpu=fpv4-sp-d16")
-set (MFLOAT_ABI               "")
+set (MFLOAT_ABI               "-mfloat-abi=hard")
 set (RUNTIME_LIBRARY          "--specs=nano.specs")
 set (RUNTIME_LIBRARY_SYSCALLS "--specs=nosys.specs")
 
@@ -54,6 +54,7 @@ set (PROJECT_SOURCES
 	drivers/src/gpio_driver.c
 	drivers/src/spi_driver.c
 	drivers/src/i2c_driver.c
+	drivers/src/bme280_driver.c
 )
 
 set (PROJECT_DEFINES
