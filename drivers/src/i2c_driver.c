@@ -14,9 +14,9 @@ static void exec_addr_phase(I2C_Handle_t *pI2CHandle, uint8_t Address, uint8_t W
 static void exec_first_10bit_addr_phase(I2C_Handle_t *pI2CHandle, uint16_t Address, uint8_t Write);
 static void exec_second_10bit_addr_phase(I2C_Handle_t *pI2CHandle, uint16_t Address);
 
-static uint8_t read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop);
-static uint8_t read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop);
-static uint8_t read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, I2C_DisableStop_e DisableStop);
+static void read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop);
+static void read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop);
+static void read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, I2C_DisableStop_e DisableStop);
 
 // Interrupt handlers
 static void it_start_handler(I2C_Handle_t *pI2CHandle);
@@ -49,8 +49,8 @@ void I2C_PeriClockControl(I2C_TypeDef *pI2Cx, uint8_t Enable) {
  * @param pI2CHandle I2C peripheral handle
  * @return OK == 0; ERROR > 0
  */
-uint8_t I2C_Init(I2C_Handle_t *pI2CHandle) {
-    if (pI2CHandle->I2C_ResetState == I2C_ResetEnabled) return 1;
+I2C_Error_e I2C_Init(I2C_Handle_t *pI2CHandle) {
+    if (pI2CHandle->I2C_ResetState == I2C_ResetEnabled) return I2C_ErrResetEnabled;
 
     // Ensure that the peripheral is disabled
     pI2CHandle->pI2Cx->CR1 &=~ (1 << I2C_CR1_PE_Pos);
@@ -92,7 +92,7 @@ uint8_t I2C_Init(I2C_Handle_t *pI2CHandle) {
     // Round the value correctly
     pI2CHandle->pI2Cx->TRISE = ((numerator + (denominator / 2)) / denominator) + 1;
 
-    return 0;
+    return I2C_ErrOK;
 }
 
 void I2C_DeInit(I2C_TypeDef *pI2Cx) {
@@ -115,8 +115,8 @@ void I2C_DeInit(I2C_TypeDef *pI2Cx) {
  * @param DisableStop Control if a repeated start should be generated
  * @return OK == 0; ERROR > 0
  */
-uint8_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, I2C_DisableStop_e DisableStop) {
-    if (Len == 0) return 1;
+I2C_Error_e I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, I2C_DisableStop_e DisableStop) {
+    if (Len == 0) return I2C_ErrLenZero;
 
     // Set ACK
     I2C_AcknowledgeControl(pI2CHandle->pI2Cx, ENABLE);
@@ -160,7 +160,7 @@ uint8_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t
         gen_stop_condition(pI2CHandle->pI2Cx);
     }
 
-    return 0;
+    return I2C_ErrOK;
 }
 
 /**
@@ -172,8 +172,8 @@ uint8_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t
  * @param DisableStop Control if a repeated start should be generated
  * @return OK == 0; ERROR > 0
  */
-uint8_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, I2C_DisableStop_e DisableStop) {
-    if (Len == 0) return 1;
+I2C_Error_e I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, I2C_DisableStop_e DisableStop) {
+    if (Len == 0) return I2C_ErrLenZero;
 
     // Set ACK
     I2C_AcknowledgeControl(pI2CHandle->pI2Cx, ENABLE);
@@ -221,7 +221,7 @@ uint8_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint
     // Re-enable ACK
     I2C_AcknowledgeControl(pI2CHandle->pI2Cx, ENABLE);
 
-    return 0;
+    return I2C_ErrOK;
 }
 
 /**
@@ -232,9 +232,9 @@ uint8_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint
  * @param SlaveAddr The address of the slave
  * @return OK == 0; ERROR > 0
  */
-uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr) {
-    if (pI2CHandle->I2C_ITState.TxRxState != I2C_Ready) return 1;
-    if (Len == 0) return 2;
+I2C_Error_e I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr) {
+    if (Len == 0) return I2C_ErrLenZero;
+    if (pI2CHandle->I2C_ITState.TxRxState != I2C_Ready) return I2C_ErrPerNotReady;
 
     pI2CHandle->I2C_ITState.DevAddr = SlaveAddr;
     pI2CHandle->I2C_ITState.TxLen = Len;
@@ -253,7 +253,7 @@ uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8
     // Generate START condition
     gen_start_condition(pI2CHandle->pI2Cx);
 
-    return 0;
+    return I2C_ErrOK;
 }
 
 /**
@@ -264,9 +264,9 @@ uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8
  * @param SlaveAddr The address of the slave
  * @return OK == 0; ERROR > 0
  */
-uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr) {
-    if (pI2CHandle->I2C_ITState.TxRxState != I2C_Ready) return 1;
-    if (Len == 0) return 2;
+I2C_Error_e I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr) {
+    if (Len == 0) return I2C_ErrLenZero;
+    if (pI2CHandle->I2C_ITState.TxRxState != I2C_Ready) return I2C_ErrPerNotReady;
 
     pI2CHandle->I2C_ITState.DevAddr = SlaveAddr;
     pI2CHandle->I2C_ITState.RxLen = Len;
@@ -294,7 +294,7 @@ uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, ui
  * @param pI2CHandle I2C peripheral handle
  * @return OK == 0; ERROR > 0
  */
-uint8_t I2C_SlaveConfigure(I2C_PerIndex_e I2CIndex, I2C_Handle_t *pI2CHandle) {
+void I2C_SlaveConfigure(I2C_PerIndex_e I2CIndex, I2C_Handle_t *pI2CHandle) {
     // Enable IRQ line
     I2C_IRQConfig(I2CIndex, 15, ENABLE);
 
@@ -308,8 +308,6 @@ uint8_t I2C_SlaveConfigure(I2C_PerIndex_e I2CIndex, I2C_Handle_t *pI2CHandle) {
     pI2CHandle->pI2Cx->CR2 |= (1 << I2C_CR2_ITEVTEN_Pos);
     pI2CHandle->pI2Cx->CR2 |= (1 << I2C_CR2_ITBUFEN_Pos);
     pI2CHandle->pI2Cx->CR2 |= (1 << I2C_CR2_ITERREN_Pos);
-
-    return 0;
 }
 
 /**
@@ -318,9 +316,8 @@ uint8_t I2C_SlaveConfigure(I2C_PerIndex_e I2CIndex, I2C_Handle_t *pI2CHandle) {
  * @param data Data to send to master
  * @return OK == 0; ERROR > 0
  */
-uint8_t I2C_SlaveSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t data) {
+void I2C_SlaveSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t data) {
     pI2CHandle->pI2Cx->DR = data;
-    return 0;
 }
 
 /**
@@ -329,9 +326,8 @@ uint8_t I2C_SlaveSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t data) {
  * @param pRXBuffer Buffer in which to store the data from master
  * @return OK == 0; ERROR > 0
  */
-uint8_t I2C_SlaveReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer) {
+void I2C_SlaveReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer) {
     *pRXBuffer = pI2CHandle->pI2Cx->DR;
-    return 0;
 }
 
 /**
@@ -520,7 +516,7 @@ void I2C_AcknowledgeControl(I2C_TypeDef *pI2Cx, uint8_t Enabled) {
 
 /* ------------ Master read data ------------ */
 
-uint8_t read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop) {
+void read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop) {
 
     // Disable ACK
     I2C_AcknowledgeControl(pI2CHandle->pI2Cx, DISABLE);
@@ -537,11 +533,9 @@ uint8_t read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_Disab
     }
 
     *pRXBuffer = pI2CHandle->pI2Cx->DR;
-
-    return 0;
 }
 
-uint8_t read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop) {
+void read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop) {
     // Disable ACK and set POS
     I2C_AcknowledgeControl(pI2CHandle->pI2Cx, DISABLE);
     pI2CHandle->pI2Cx->CR1 |= (1 << I2C_CR1_POS_Pos);
@@ -558,11 +552,9 @@ uint8_t read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_Disable
 
     pRXBuffer[0] = pI2CHandle->pI2Cx->DR;
     pRXBuffer[1] = pI2CHandle->pI2Cx->DR;
-
-    return 0;
 }
 
-uint8_t read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, I2C_DisableStop_e DisableStop) {
+void read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, I2C_DisableStop_e DisableStop) {
     // Clear ADDR flag
     clear_addr_flag(pI2CHandle);
 
@@ -589,8 +581,6 @@ uint8_t read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_
     // Read last 2 bytes
     pRXBuffer[Len - 2] = pI2CHandle->pI2Cx->DR;
     pRXBuffer[Len - 1] = pI2CHandle->pI2Cx->DR;
-
-    return 0;
 }
 
 /* ------------ Interrupt Handlers ------------ */

@@ -35,6 +35,18 @@
  */
 #define I2C_MAX_TRISE_NS_FOR_SPEED(speed)                  (speed <= I2C_SclSpeedSM ? 1000 : 300)
 
+/* ------------ ERROR CODES ------------ */
+
+typedef enum {
+    I2C_ErrOK,
+    I2C_ErrResetEnabled,
+    I2C_ErrLenZero,
+    I2C_ErrPerNotReady
+} I2C_Error_e;
+
+
+/* ------------ CONFIG STRUCTURES ------------ */
+
 typedef enum {
     I2C_Index_1 = 1,
     I2C_Index_2,
@@ -112,6 +124,8 @@ typedef struct {
     I2C_ITState_t I2C_ITState;                  // Used when using interrupts
 } I2C_Handle_t;
 
+/* ------------ METHODS ------------ */
+
 /*
  * Peripheral Clock Setup
  */
@@ -120,21 +134,21 @@ void I2C_PeriClockControl(I2C_TypeDef *pI2Cx, uint8_t Enable);
 /*
  * Init and De-Init
  */
-uint8_t I2C_Init(I2C_Handle_t *pI2CHandle);
+I2C_Error_e I2C_Init(I2C_Handle_t *pI2CHandle);
 void I2C_DeInit(I2C_TypeDef *pI2Cx);
 
 /*
  * Data send and receive
  */
-uint8_t I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, I2C_DisableStop_e DisableStop);
-uint8_t I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, I2C_DisableStop_e DisableStop);
+I2C_Error_e I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr, I2C_DisableStop_e DisableStop);
+I2C_Error_e I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr, I2C_DisableStop_e DisableStop);
 
-uint8_t I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr);
-uint8_t I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr);
+I2C_Error_e I2C_MasterSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uint8_t Len, uint16_t SlaveAddr);
+I2C_Error_e I2C_MasterReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, uint16_t SlaveAddr);
 
-uint8_t I2C_SlaveConfigure(I2C_PerIndex_e I2CIndex, I2C_Handle_t *pI2CHandle);
-uint8_t I2C_SlaveSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t data);
-uint8_t I2C_SlaveReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer);
+void I2C_SlaveConfigure(I2C_PerIndex_e I2CIndex, I2C_Handle_t *pI2CHandle);
+void I2C_SlaveSendDataIT(I2C_Handle_t *pI2CHandle, uint8_t data);
+void I2C_SlaveReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer);
 
 /*
  * Other controls
