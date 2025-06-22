@@ -38,14 +38,14 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle) {
 
     // GPIO Mode Configuration
     pGPIOHandle->pGPIOx->MODER &=~ (0b11 << (2 * pinNumber)); // Clear the mode bits
-    if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode <= GPIO_MODE_ANALOG) {
+    if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode <= GPIO_ModeAnalog) {
         pGPIOHandle->pGPIOx->MODER |= pGPIOHandle->GPIO_PinConfig.GPIO_PinMode << (2 * pinNumber);
     } else {
         // Configure rising / falling edge
-        if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_MODE_INPUT_R_EDGE) {
+        if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_ModeInputREdge) {
             EXTI->FTSR &=~ 1 << pinNumber;
             EXTI->RTSR |= 1 << pinNumber;
-        } else if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_MODE_INPUT_F_EDGE) {
+        } else if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_ModeInputFEdge) {
             EXTI->RTSR &=~ 1 << pinNumber;
             EXTI->FTSR |= 1 << pinNumber;
         } else {
@@ -72,7 +72,7 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle) {
     pGPIOHandle->pGPIOx->OTYPER |= pGPIOHandle->GPIO_PinConfig.GPIO_PinOPType << pinNumber;
 
     // GPI Alternate Function Configuration
-    if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_MODE_ALTERNATE) {
+    if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_ModeAlternate) {
         pGPIOHandle->pGPIOx->AFR[pinNumber / 8] |= pGPIOHandle->GPIO_PinConfig.GPIO_PinAltFunMode << 4 * (pinNumber % 8);
     }
 }
@@ -96,7 +96,7 @@ void GPIO_DeInit(GPIO_TypeDef *pGPIOx) {
  * @param PinNumber GPIO Pin
  * @return Data read from the GPIO Pin
  */
-uint8_t GPIO_ReadFromInputPin(GPIO_TypeDef *pGPIOx, uint8_t PinNumber) {
+uint8_t GPIO_ReadFromInputPin(GPIO_TypeDef *pGPIOx, GPIO_Pin_e PinNumber) {
     return (pGPIOx->IDR >> PinNumber) & 1;
 }
 
@@ -115,7 +115,7 @@ uint32_t GPIO_ReadFromInputPort(GPIO_TypeDef *pGPIOx) {
  * @param PinNumber GPIO Pin
  * @param Value Value to write
  */
-void GPIO_WriteToOutputPin(GPIO_TypeDef *pGPIOx, uint8_t PinNumber, uint8_t Value) {
+void GPIO_WriteToOutputPin(GPIO_TypeDef *pGPIOx, GPIO_Pin_e PinNumber, uint8_t Value) {
     if (Value == 1) pGPIOx->ODR |= (1 << PinNumber);
     else pGPIOx->ODR &=~ (1 << PinNumber);
 }
@@ -134,7 +134,7 @@ void GPIO_WriteToOutputPort(GPIO_TypeDef *pGPIOx, uint32_t Value) {
  * @param pGPIOx GPIO Port
  * @param PinNumber GPIO Pin
  */
-void GPIO_ToggleOutputPin(GPIO_TypeDef *pGPIOx, uint8_t PinNumber) {
+void GPIO_ToggleOutputPin(GPIO_TypeDef *pGPIOx, GPIO_Pin_e PinNumber) {
     pGPIOx->ODR ^= (1 << PinNumber);
 }
 
@@ -144,7 +144,7 @@ void GPIO_ToggleOutputPin(GPIO_TypeDef *pGPIOx, uint8_t PinNumber) {
  * @param IRQPriority IRQ Priority (0 - 15)
  * @param Enabled If the IRQ is enabled
  */
-void GPIO_IRQConfig(uint8_t PinNumber, uint8_t IRQPriority, uint8_t Enabled) {
+void GPIO_IRQConfig(GPIO_Pin_e PinNumber, uint8_t IRQPriority, uint8_t Enabled) {
     uint8_t IRQNumber = GPIO_PIN_TO_IRQ_NUMBER(PinNumber);
 
     if (Enabled) {
@@ -161,7 +161,7 @@ void GPIO_IRQConfig(uint8_t PinNumber, uint8_t IRQPriority, uint8_t Enabled) {
  * @brief Clears the EXTI Pending Register for the specified GPIO
  * @param PinNumber GPIO Pin
  */
-void GPIO_IRQHandling(uint8_t PinNumber) {
+void GPIO_IRQHandling(GPIO_Pin_e PinNumber) {
     if (EXTI->PR & (1 << PinNumber)) {
         EXTI->PR |= (1 << PinNumber);
     }

@@ -48,6 +48,16 @@
 #define BME280_CTRL_MEAS_OSRST_POS              5U
 #define BME280_CTRL_MEAS_MODE_POS               0U
 
+/* ------------ ERROR CODES ------------ */
+
+typedef enum {
+    BME280_ErrOK,
+    BME280_ErrConnFail,
+    BME280_WriteErr,
+    BME280_ReadErr,
+    BME280_PressErr
+} BME280_Error_t;
+
 /* ------------ CONFIG STRUCTURES ------------ */
 
 typedef enum {
@@ -91,7 +101,6 @@ typedef enum {
 
 typedef struct {
     BME280_AddrPin_e AddrPin;
-    BME280_Mode_e Mode;
     BME280_FilterCoeff_e FilterCoeff;
     BME280_Oversampling_e PressureOversampling;
     BME280_Oversampling_e HumidityOversampling;
@@ -137,15 +146,15 @@ typedef struct {
 } __attribute__((packed)) BME280_CompensationParameters_t;
 
 typedef struct {
-    uint32_t UPressure;
-    uint32_t UTemperature;
-    uint32_t UHumidity;
+    int32_t UPressure;
+    int32_t UTemperature;
+    int32_t UHumidity;
 } BME280_UncompensatedResult_t;
 
 typedef struct {
-    uint32_t Pressure;
-    uint32_t Temperature;
-    uint32_t Humidity;
+    float Pressure;
+    float Temperature;
+    float Humidity;
 } BME280_Result_t;
 
 /* ------------ METHODS ------------ */
@@ -153,12 +162,12 @@ typedef struct {
 /*
  * Confugration
  */
-uint8_t BME280_Configure(BME280_Handle_t *pBME280Handle);
+BME280_Error_t BME280_Configure(BME280_Handle_t *pBME280Handle);
 
 /*
  * Read data
  */
- uint8_t BME280_GetSample(BME280_Handle_t *pBME280Handle, BME280_Result_t *pResult);
+ BME280_Error_t BME280_GetSample(BME280_Handle_t *pBME280Handle, BME280_Result_t *pResult);
 
 /*
  * Power controls
@@ -171,6 +180,8 @@ void BME280_DisableVDDIO(BME280_Handle_t *pBME280Handle);
 /*
  * Other controls
  */
+BME280_Error_t BME280_CheckDeviceID(BME280_Handle_t *pBME280Handle);
+BME280_Error_t BME280_SetMode(BME280_Handle_t *pBME280Handle, BME280_Mode_e Mode);
 void BME280_Reset(BME280_Handle_t *pBME280Handle);
 
 #endif //BME280_DRIVER_H

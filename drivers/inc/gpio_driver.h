@@ -49,86 +49,79 @@
                                      (pin >= 5 && pin <= 9) ? EXTI9_5_IRQn :\
                                      (pin >= 10 && pin <= 15) ? EXTI15_10_IRQn : EXTI0_IRQn)
 
-/**
- * @GPIO_PINS
- */
-#define GPIO_PIN_NO_0               0
-#define GPIO_PIN_NO_1               1
-#define GPIO_PIN_NO_2               2
-#define GPIO_PIN_NO_3               3
-#define GPIO_PIN_NO_4               4
-#define GPIO_PIN_NO_5               5
-#define GPIO_PIN_NO_6               6
-#define GPIO_PIN_NO_7               7
-#define GPIO_PIN_NO_8               8
-#define GPIO_PIN_NO_9               9
-#define GPIO_PIN_NO_10              10
-#define GPIO_PIN_NO_11              11
-#define GPIO_PIN_NO_12              12
-#define GPIO_PIN_NO_13              13
-#define GPIO_PIN_NO_14              14
-#define GPIO_PIN_NO_15              15
+typedef enum {
+    GPIO_PinNo0,
+    GPIO_PinNo1,
+    GPIO_PinNo2,
+    GPIO_PinNo3,
+    GPIO_PinNo4,
+    GPIO_PinNo5,
+    GPIO_PinNo6,
+    GPIO_PinNo7,
+    GPIO_PinNo8,
+    GPIO_PinNo9,
+    GPIO_PinNo10,
+    GPIO_PinNo11,
+    GPIO_PinNo12,
+    GPIO_PinNo13,
+    GPIO_PinNo14,
+    GPIO_PinNo15
+} GPIO_Pin_e;
 
-/**
- * @GPIO_PIN_MODES
- */
-#define GPIO_MODE_INPUT             0
-#define GPIO_MODE_OUTPUT            1
-#define GPIO_MODE_ALTERNATE         2
-#define GPIO_MODE_ANALOG            3
-#define GPIO_MODE_INPUT_F_EDGE      4
-#define GPIO_MODE_INPUT_R_EDGE      5
-#define GPIO_MODE_INPUT_RF_EDGE     6
+typedef enum {
+    GPIO_ModeInput,
+    GPIO_ModeOutput,
+    GPIO_ModeAlternate,
+    GPIO_ModeAnalog,
+    GPIO_ModeInputFEdge,
+    GPIO_ModeInputREdge,
+    GPIO_ModeInputRFEdge
+} GPIO_PinMode_e;
 
-/**
- * @GPIO_PIN_SPEEDS
- */
-#define GPIO_SPEED_LOW              0
-#define GPIO_SPEED_MEDIUM           1
-#define GPIO_SPEED_HIGH             2
-#define GPIO_SPEED_VERY_HIGH        3
+typedef enum {
+    GPIO_SpeedLow,
+    GPIO_SpeedMedium,
+    GPIO_SpeedHigh,
+    GPIO_SpeedVeryHigh
+} GPIO_Speed_e;
 
-/**
- * @GPIO_PULL_UP_DOWN_MODES
- */
-#define GPIO_NO_PUPD                0
-#define GPIO_PU                     1
-#define GPIO_PD                     2
+typedef enum {
+    GPIO_NoPuPd,
+    GPIO_Pu,
+    GPIO_Pd
+} GPIO_PullUpDownMode_e;
 
-/**
- * @GPIO_PULL_OUTPUT_MODES
- */
-#define GPIO_OP_TYPE_PP             0
-#define GPIO_OP_TYPE_OD             1
+typedef enum {
+    GPIO_OpTypePP,
+    GPIO_OpTypeOD
+} GPIO_OutputType_e;
 
-/**
- * @GPIO_ALTERNATE_FUNCTIONS
- */
-#define GPIO_AF0                    0
-#define GPIO_AF1                    1
-#define GPIO_AF2                    2
-#define GPIO_AF3                    3
-#define GPIO_AF4                    4
-#define GPIO_AF5                    5
-#define GPIO_AF6                    6
-#define GPIO_AF7                    7
-#define GPIO_AF8                    8
-#define GPIO_AF9                    9
-#define GPIO_AF10                   10
-#define GPIO_AF11                   11
-#define GPIO_AF12                   12
-#define GPIO_AF13                   13
-#define GPIO_AF14                   14
-#define GPIO_AF15                   15
-
+typedef enum {
+    GPIO_AF0,
+    GPIO_AF1,
+    GPIO_AF2,
+    GPIO_AF3,
+    GPIO_AF4,
+    GPIO_AF5,
+    GPIO_AF6,
+    GPIO_AF7,
+    GPIO_AF8,
+    GPIO_AF9,
+    GPIO_AF10,
+    GPIO_AF11,
+    GPIO_AF12,
+    GPIO_AF13,
+    GPIO_AF14,
+    GPIO_AF15,
+} GPIO_AlternateFunction_e;
 
 typedef struct {
-    uint8_t GPIO_PinNumber;         /** Possible values from @GPIO_PINS */
-    uint8_t GPIO_PinMode;           /** Possible values from @GPIO_PIN_MODES */
-    uint8_t GPIO_PinSpeed;          /** Possible values from @GPIO_PIN_SPEEDS */
-    uint8_t GPIO_PinPuPdControl;    /** Possible values from @GPIO_PULL_UP_DOWN_MODES */
-    uint8_t GPIO_PinOPType;         /** Possible values from @GPIO_PULL_OUTPUT_MODES */
-    uint8_t GPIO_PinAltFunMode;
+    GPIO_Pin_e GPIO_PinNumber;
+    GPIO_PinMode_e GPIO_PinMode;
+    GPIO_Speed_e GPIO_PinSpeed;
+    GPIO_PullUpDownMode_e GPIO_PinPuPdControl;
+    GPIO_OutputType_e GPIO_PinOPType;
+    GPIO_AlternateFunction_e GPIO_PinAltFunMode;
 } GPIO_PinConfig_t;
 
 typedef struct {
@@ -150,16 +143,16 @@ void GPIO_DeInit(GPIO_TypeDef *pGPIOx);
 /*
  * Data read and write
  */
-uint8_t GPIO_ReadFromInputPin(GPIO_TypeDef *pGPIOx, uint8_t PinNumber);
+uint8_t GPIO_ReadFromInputPin(GPIO_TypeDef *pGPIOx, GPIO_Pin_e PinNumber);
 uint32_t GPIO_ReadFromInputPort(GPIO_TypeDef *pGPIOx);
-void GPIO_WriteToOutputPin(GPIO_TypeDef *pGPIOx, uint8_t PinNumber, uint8_t Value);
+void GPIO_WriteToOutputPin(GPIO_TypeDef *pGPIOx, GPIO_Pin_e PinNumber, uint8_t Value);
 void GPIO_WriteToOutputPort(GPIO_TypeDef *pGPIOx, uint32_t Value);
-void GPIO_ToggleOutputPin(GPIO_TypeDef *pGPIOx, uint8_t PinNumber);
+void GPIO_ToggleOutputPin(GPIO_TypeDef *pGPIOx, GPIO_Pin_e PinNumber);
 
 /*
  * IRQ Configuration
  */
-void GPIO_IRQConfig(uint8_t PinNumber, uint8_t IRQPriority, uint8_t Enabled);
-void GPIO_IRQHandling(uint8_t PinNumber);
+void GPIO_IRQConfig(GPIO_Pin_e PinNumber, uint8_t IRQPriority, uint8_t Enabled);
+void GPIO_IRQHandling(GPIO_Pin_e PinNumber);
 
 #endif //GPIO_DRIVER_H

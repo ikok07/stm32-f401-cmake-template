@@ -7,13 +7,13 @@
 // Used for calculation of pressure
 int32_t tFine;
 
-static uint8_t write_to_register(BME280_Handle_t *pBME280Handle, BME280_RegValuePair_t *pRegValuePairs, uint8_t Len);
-static uint8_t read_from_register(BME280_Handle_t *pBME280Handle, uint8_t RegisterAddr, uint8_t *pRXBuffer, uint8_t Len);
+static BME280_Error_t write_to_register(BME280_Handle_t *pBME280Handle, BME280_RegValuePair_t *pRegValuePairs, uint8_t Len);
+static BME280_Error_t read_from_register(BME280_Handle_t *pBME280Handle, uint8_t RegisterAddr, uint8_t *pRXBuffer, uint8_t Len);
 
-static uint8_t get_compensation_parameters(BME280_Handle_t *pBME280Handle, BME280_CompensationParameters_t *compensationParameters);
-static uint8_t fpu_compensate_temperature(BME280_CompensationParameters_t compensationParameters, int32_t adc_temperature, float *final_temperature);
-static uint8_t fpu_compensate_pressure(BME280_CompensationParameters_t compensationParameters, int32_t adc_pressure, float *final_pressure);
-static uint8_t fpu_compensate_humidity(BME280_CompensationParameters_t compensationParameters, int32_t adc_humidity, float *final_humidity)
+static BME280_Error_t get_compensation_parameters(BME280_Handle_t *pBME280Handle, BME280_CompensationParameters_t *compensationParameters);
+static void fpu_compensate_temperature(BME280_CompensationParameters_t compensationParameters, int32_t adc_temperature, float *final_temperature);
+static BME280_Error_t fpu_compensate_pressure(BME280_CompensationParameters_t compensationParameters, int32_t adc_pressure, float *final_pressure);
+static void fpu_compensate_humidity(BME280_CompensationParameters_t compensationParameters, int32_t adc_humidity, float *final_humidity);
 
 /**
  * @brief Initializes the device
@@ -21,8 +21,7 @@ static uint8_t fpu_compensate_humidity(BME280_CompensationParameters_t compensat
  * @param pBME280Handle BME280 handle
  * @return OK - 0; ERROR > 0
  */
-uint8_t BME280_Configure(BME280_Handle_t *pBME280Handle) {
-
+BME280_Error_t BME280_Configure(BME280_Handle_t *pBME280Handle) {
     uint8_t configReg = 0;
     uint8_t humReg = 0;
     uint8_t measReg = 0;
@@ -35,7 +34,7 @@ uint8_t BME280_Configure(BME280_Handle_t *pBME280Handle) {
         .Value = humReg
    };
 
-    uint8_t err;
+    BME280_Error_t err;
 
     // Apply config
     if ((err = write_to_register(pBME280Handle, &hum_reg_value_pair, 1)) != 0) {
@@ -47,9 +46,6 @@ uint8_t BME280_Configure(BME280_Handle_t *pBME280Handle) {
 
     // Standby duration
     configReg |= (pBME280Handle->BME280_Config.NormalModeStanbyDuration << BME280_CONFIG_TSB_POS);
-
-    // Device mode
-    measReg |= (pBME280Handle->BME280_Config.Mode << BME280_CTRL_MEAS_MODE_POS);
 
     // Pressure oversampling
     measReg |= (pBME280Handle->BME280_Config.PressureOversampling << BME280_CTRL_MEAS_OSRSP_POS);
@@ -73,17 +69,40 @@ uint8_t BME280_Configure(BME280_Handle_t *pBME280Handle) {
         return err;
     }
 
-    return 0;
+    return BME280_ErrOK;
 }
 
-uint8_t BME280_GetSample(BME280_Handle_t *pBME280Handle, BME280_Result_t *pResult) {
-    BME280_UncompensatedResult_t *uncompensatedResult[1];
-    uint8_t err;
-    if ((err = read_from_register(pBME280Handle, BME280_REG_PRESS_MSB, uncompensatedResult, sizeof(uncompensatedResult))) != 0) {
+/**
+ * @brief Reads the current values measured by the sensor
+ * @param pBME280Handle BME280 handle
+ * @param pResult Result returned from the sensor
+ * @return OK - 0; ERROR > 0
+ */
+BME280_Error_t BME280_GetSample(BME280_Handle_t *pBME280Handle, BME280_Result_t *pResult) {
+    uint8_t rawData[8];
+    BME280_UncompensatedResult_t uncompensatedResult;
+    BME280_Error_t err;
+
+    if ((err = read_from_register(pBME280Handle, BME280_REG_PRESS_MSB, rawData, sizeof(rawData))) != 0) {
         return err;
     }
 
+    uncompensatedResult.UPressure = (rawData[0] << 12) | (rawData[1] << 4) | (rawData[2] >> 4);
+    uncompensatedResult.UTemperature = (rawData[3] << 12) | (rawData[4] << 4) | (rawData[5] >> 4);
+    uncompensatedResult.UHumidity = (rawData[6] << 8) | rawData[7];
 
+    BME280_CompensationParameters_t compensationParameters;
+    if ((err = get_compensation_parameters(pBME280Handle, &compensationParameters)) != 0) {
+        return err;
+    }
+
+    fpu_compensate_temperature(compensationParameters, uncompensatedResult.UTemperature, &pResult->Temperature);
+    if ((err = fpu_compensate_pressure(compensationParameters, uncompensatedResult.UPressure, &pResult->Pressure)) != 0) {
+        return err;
+    }
+    fpu_compensate_humidity(compensationParameters, uncompensatedResult.UHumidity, &pResult->Humidity);
+
+    return BME280_ErrOK;
 }
 
 /**
@@ -134,6 +153,49 @@ void BME280_DisableVDDIO(BME280_Handle_t *pBME280Handle) {
     );
 }
 
+BME280_Error_t BME280_CheckDeviceID(BME280_Handle_t *pBME280Handle) {
+    uint8_t err;
+    uint8_t regValue;
+    if ((err = read_from_register(pBME280Handle, BME280_REG_ID, &regValue, 1))) {
+        return err;
+    }
+
+    if (regValue != 0x60) return BME280_ErrConnFail;
+
+    return BME280_ErrOK;
+}
+
+/**
+ * @brief Used for setting the sensor in one of the three supported modes - Sleep, Forced or Normal
+ * @param pBME280Handle BME280 handle
+ * @param Mode The mode in which to set the device
+ * @return OK - 1; ERROR > 0
+ */
+BME280_Error_t BME280_SetMode(BME280_Handle_t *pBME280Handle, BME280_Mode_e Mode) {
+    BME280_Error_t err;
+
+    // Fetch current register value
+    uint8_t regValue;
+    if ((err = read_from_register(pBME280Handle, BME280_REG_CTRL_MEAS, &regValue, 1))) {
+        return err;
+    }
+
+    // Device mode
+    regValue &=~ (0x03 << BME280_CTRL_MEAS_MODE_POS);
+    regValue |= (Mode << BME280_CTRL_MEAS_MODE_POS);
+
+    BME280_RegValuePair_t regValuePair = {
+        .RegisterAddr = BME280_REG_CTRL_MEAS,
+        .Value = regValue
+    };
+
+    if ((err = write_to_register(pBME280Handle, &regValuePair, 1))) {
+        return err;
+    }
+
+    return BME280_ErrOK;
+}
+
 /**
  * @brief Resets the sensor
  * @param pBME280Handle BME280 handle
@@ -143,7 +205,7 @@ void BME280_Reset(BME280_Handle_t *pBME280Handle) {
     BME280_EnableVDD(pBME280Handle);
 }
 
-uint8_t write_to_register(BME280_Handle_t *pBME280Handle, BME280_RegValuePair_t *pRegValuePairs, uint8_t Len) {
+BME280_Error_t write_to_register(BME280_Handle_t *pBME280Handle, BME280_RegValuePair_t *pRegValuePairs, uint8_t Len) {
     uint8_t addr = pBME280Handle->BME280_Config.AddrPin == BME280_AddrPinLOW ? 0x76 : 0x77;
 
     I2C_Error_e err = I2C_MasterSendData(
@@ -154,13 +216,13 @@ uint8_t write_to_register(BME280_Handle_t *pBME280Handle, BME280_RegValuePair_t 
         I2C_StopEnabled
     );
     if (err != I2C_ErrOK) {
-        return 1;
+        return BME280_WriteErr;
     }
 
-    return 0;
+    return BME280_ErrOK;
 }
 
-uint8_t read_from_register(BME280_Handle_t *pBME280Handle, uint8_t RegisterAddr, uint8_t *pRXBuffer, uint8_t Len) {
+BME280_Error_t read_from_register(BME280_Handle_t *pBME280Handle, uint8_t RegisterAddr, uint8_t *pRXBuffer, uint8_t Len) {
     uint8_t addr = pBME280Handle->BME280_Config.AddrPin == BME280_AddrPinLOW ? 0x76 : 0x77;
     I2C_Error_e err = I2C_MasterSendData(
         pBME280Handle->pI2C_Handle,
@@ -170,7 +232,7 @@ uint8_t read_from_register(BME280_Handle_t *pBME280Handle, uint8_t RegisterAddr,
         I2C_StopDisabled
     );
     if (err != I2C_ErrOK) {
-        return 1;
+        return BME280_WriteErr;
     }
 
     err = I2C_MasterReceiveData(
@@ -181,19 +243,19 @@ uint8_t read_from_register(BME280_Handle_t *pBME280Handle, uint8_t RegisterAddr,
         I2C_StopEnabled
     );
     if (err != I2C_ErrOK) {
-        return 2;
+        return BME280_ReadErr;
     }
 
     return 0;
 }
 
-uint8_t get_compensation_parameters(BME280_Handle_t *pBME280Handle, BME280_CompensationParameters_t *compensationParameters) {
-    uint8_t calib_len = BME280_REG_CALIB25 - BME280_REG_CALIB00; // 25
-    uint8_t humid_len = BME280_REG_CALIB41 - BME280_REG_CALIB26; // 7
-    uint8_t calib_data[25];
-    uint8_t humid_data[7];
+BME280_Error_t get_compensation_parameters(BME280_Handle_t *pBME280Handle, BME280_CompensationParameters_t *compensationParameters) {
+    uint8_t calib_len = BME280_REG_CALIB25 - BME280_REG_CALIB00 + 1; // 26
+    uint8_t humid_len = BME280_REG_CALIB41 - BME280_REG_CALIB26 + 1; // 16
+    uint8_t calib_data[26];
+    uint8_t humid_data[16];
 
-    uint8_t err;
+    BME280_Error_t err;
 
     // Read up to Dig_H1
     if ((err = read_from_register(pBME280Handle, BME280_REG_CALIB00, calib_data, calib_len))) {
@@ -236,10 +298,10 @@ uint8_t get_compensation_parameters(BME280_Handle_t *pBME280Handle, BME280_Compe
     compensationParameters->Dig_H5 = (int16_t)((humid_data[5] << 4) | (humid_data[4] >> 4));
 
     compensationParameters->Dig_H6 = (int8_t)humid_data[6];
-    return 0;
+    return BME280_ErrOK;
 }
 
-uint8_t fpu_compensate_temperature(BME280_CompensationParameters_t compensationParameters, int32_t adc_temperature, float *final_temperature) {
+void fpu_compensate_temperature(BME280_CompensationParameters_t compensationParameters, int32_t adc_temperature, float *final_temperature) {
     float var1, var2, T;
     var1 = (((float)adc_temperature) / 16384.0f - ((float)compensationParameters.Dig_T1) / 1024.0f) * ((float)compensationParameters.Dig_T2);
     var2 = (((float)adc_temperature) / 131072.0f - ((float)compensationParameters.Dig_T1)/8192.0f) * (((float)adc_temperature / 131072.0 - ((float)compensationParameters.Dig_T1) / 8192.0f)) * ((float)compensationParameters.Dig_T3);
@@ -250,10 +312,9 @@ uint8_t fpu_compensate_temperature(BME280_CompensationParameters_t compensationP
     T = (var1 + var2) / 5120.0f;
 
     *final_temperature = T;
-    return 0;
 }
 
-uint8_t fpu_compensate_pressure(BME280_CompensationParameters_t compensationParameters, int32_t adc_pressure, float *final_pressure) {
+BME280_Error_t fpu_compensate_pressure(BME280_CompensationParameters_t compensationParameters, int32_t adc_pressure, float *final_pressure) {
     float var1, var2, p;
 
     // Note: tFine should be calculated from temperature compensation first
@@ -268,7 +329,7 @@ uint8_t fpu_compensate_pressure(BME280_CompensationParameters_t compensationPara
 
     if (var1 == 0.0f) {
         *final_pressure = 0.0f;
-        return 0;
+        return BME280_PressErr;
     }
 
     p = 1048576.0f - (float)adc_pressure;
@@ -279,10 +340,10 @@ uint8_t fpu_compensate_pressure(BME280_CompensationParameters_t compensationPara
     p = p + (var1 + var2 + ((float)compensationParameters.Dig_P7)) / 16.0f;
 
     *final_pressure = p;
-    return 0;
+    return BME280_ErrOK;
 }
 
-uint8_t fpu_compensate_humidity(BME280_CompensationParameters_t compensationParameters, int32_t adc_humidity, float *final_humidity) {
+void fpu_compensate_humidity(BME280_CompensationParameters_t compensationParameters, int32_t adc_humidity, float *final_humidity) {
     float varH;
 
     // Note: tFine should be calculated from temperature compensation first
@@ -298,6 +359,4 @@ uint8_t fpu_compensate_humidity(BME280_CompensationParameters_t compensationPara
     }
 
     *final_humidity = varH;
-
-    return 0;
 }

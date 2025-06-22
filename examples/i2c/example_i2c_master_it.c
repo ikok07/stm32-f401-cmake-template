@@ -40,10 +40,10 @@ int main(void) {
         .pGPIOx = GPIOC,
         .GPIO_PinConfig = {
             .GPIO_PinNumber = LED_PIN,
-            .GPIO_PinMode = GPIO_MODE_OUTPUT,
-            .GPIO_PinOPType = GPIO_OP_TYPE_PP,
-            .GPIO_PinPuPdControl = GPIO_NO_PUPD,
-            .GPIO_PinSpeed = GPIO_SPEED_HIGH
+            .GPIO_PinMode = GPIO_ModeOutput,
+            .GPIO_PinOPType = GPIO_OpTypePP,
+            .GPIO_PinPuPdControl = GPIO_NoPuPd,
+            .GPIO_PinSpeed = GPIO_SpeedHigh
         }
     };
 
@@ -53,17 +53,17 @@ int main(void) {
     // Init the BTN
     gpioHandle.pGPIOx = GPIOA;
     gpioHandle.GPIO_PinConfig.GPIO_PinNumber = BTN_PIN;
-    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_PU;
-    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_INPUT_F_EDGE;
+    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_Pu;
+    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeInputFEdge;
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
     // Init I2C SCL
     gpioHandle.pGPIOx = GPIOB;
     gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SCL;
-    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_MODE_ALTERNATE;
-    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NO_PUPD;
-    gpioHandle.GPIO_PinConfig.GPIO_PinOPType = GPIO_OP_TYPE_OD;
+    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAlternate;
+    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
+    gpioHandle.GPIO_PinConfig.GPIO_PinOPType = GPIO_OpTypeOD;
     gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF4;
     GPIO_Init(&gpioHandle);
 

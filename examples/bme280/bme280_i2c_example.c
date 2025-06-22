@@ -1,7 +1,8 @@
 //
-// Created by Kok on 6/21/25.
+// Created by Kok on 6/22/25.
 //
 
+#include <bme280_i2c_driver.h>
 #include <i2c_driver.h>
 #include <string.h>
 
@@ -21,35 +22,49 @@
 #define I2C_SCL             8
 
 #define CURR_ADDR           0x01
-#define MASTER_ADDR         0x03
 
 volatile uint8_t button_trigger = 0;
-uint8_t tx_buffer[4] = {1, 2, 3, 4};
-uint8_t tx_buffer_index = 0;
 uint8_t err;
+
+GPIO_Handle_t gpioHandle = {
+    .pGPIOx = GPIOC,
+    .GPIO_PinConfig = {
+        .GPIO_PinNumber = LED_PIN,
+        .GPIO_PinMode = GPIO_ModeOutput,
+        .GPIO_PinOPType = GPIO_OpTypePP,
+        .GPIO_PinPuPdControl = GPIO_NoPuPd,
+        .GPIO_PinSpeed = GPIO_SpeedHigh
+    }
+};
 
 I2C_Handle_t i2cHandle = {
     .pI2Cx = I2C1,
     .I2C_Config = {
-        .I2C_SCLSpeed = I2C_SclSpeedSM,
+        .I2C_SCLSpeed = I2C_SclSpeedFM4K,
         .I2C_DeviceAddressLen = I2C_DeviceAddr7Bits,
         .I2C_DeviceAddress = CURR_ADDR,
         .I2C_FMDutyCycle = I2C_FmDuty2
     }
 };
 
-int main(void) {
-    GPIO_Handle_t gpioHandle = {
-        .pGPIOx = GPIOC,
-        .GPIO_PinConfig = {
-            .GPIO_PinNumber = LED_PIN,
-            .GPIO_PinMode = GPIO_ModeOutput,
-            .GPIO_PinOPType = GPIO_OpTypePP,
-            .GPIO_PinPuPdControl = GPIO_NoPuPd,
-            .GPIO_PinSpeed = GPIO_SpeedHigh
-        }
-    };
+BME280_Handle_t bme280Handle = {
+    .pI2C_Handle = &i2cHandle,
+    .BME280_Config = {
+        .AddrPin = BME280_AddrPinLOW,
+        .FilterCoeff = BME280_FilterCoeffOFF,
+        .PressureOversampling = BME280_Oversampling1,
+        .TemperatureOversampling = BME280_Oversampling1,
+        .HumidityOversampling = BME280_Oversampling1,
+        .NormalModeStanbyDuration = BME280_StandbyDuration100
+    }
+};
 
+void SystemInit() {
+    // Enable FPU
+    SCB->CPACR |= 0xF << 20;
+}
+
+int main(void) {
     // Init the LED
     GPIO_Init(&gpioHandle);
 
@@ -77,7 +92,16 @@ int main(void) {
     // Init I2C
     I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
     I2C_Init(&i2cHandle);
-    I2C_SlaveConfigure(I2C_Index_1, &i2cHandle);
+    I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
+
+    // Configure BME280
+    BME280_Configure(&bme280Handle);
+    if (BME280_CheckDeviceID(&bme280Handle) != BME280_ErrOK) {
+        // Device not connected!
+        while (1);
+    }
+
+    BME280_SetMode(&bme280Handle, BME280_ModeNormal);
 
     while (1) {
         if (button_trigger) {
@@ -85,6 +109,11 @@ int main(void) {
             for (int i = 0; i < 1000000; i++);
 
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+
+            BME280_Result_t result = {0};
+            if ((err = BME280_GetSample(&bme280Handle, &result)) != 0) {
+                while (1);
+            }
 
             button_trigger = 0;
         }
@@ -94,29 +123,4 @@ int main(void) {
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
     button_trigger = 1;
-}
-
-void I2C1_EV_IRQHandler() {
-    I2C_IRQEventHandling(&i2cHandle);
-}
-
-void I2C1_ER_IRQHandler() {
-    I2C_IRQErrorHandling(&i2cHandle);
-}
-
-void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEvent) {
-    if (pI2CHandle->pI2Cx == I2C1) {
-        switch (AppEvent) {
-            case I2C_EventDataRequest:
-                if (tx_buffer_index == 4) tx_buffer_index = 0;
-                I2C_SlaveSendDataIT(pI2CHandle, tx_buffer[tx_buffer_index++]);
-                break;
-            case I2C_EventNACK:
-                GPIO_ToggleOutputPin(GPIOC, LED_PIN);
-                break;
-            // Other events...
-            default:
-                break;
-        }
-    }
 }
