@@ -54,7 +54,7 @@ set (PROJECT_SOURCES
 	drivers/src/gpio_driver.c
 	drivers/src/spi_driver.c
 	drivers/src/i2c_driver.c
-	drivers/src/bme280_driver.c
+	drivers/src/bme280_i2c_driver.c
 )
 
 set (PROJECT_DEFINES
