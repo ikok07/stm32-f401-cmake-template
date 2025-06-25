@@ -1,0 +1,162 @@
+//
+// Created by Kok on 6/25/25.
+//
+
+#ifndef USART_DRIVER_H
+#define USART_DRIVER_H
+
+#include "stm32f4xx.h"
+
+/* ------------ ERROR CODES ------------ */
+
+typedef enum {
+    USART_ErrOK,
+    USART_ErrInvalidBaudRate
+} USART_Error_e;
+
+/* ------------ CONFIG STRUCTURES ------------ */
+
+typedef enum {
+    USART_EventTxComplete,
+    USART_EventRxComplete,
+    USART_EventDataRequest,                   // when the slave sends data to master
+    USART_EventDataReceive,                   // when the master sends data to the slave
+} USART_Event_e;
+
+typedef enum {
+    USART_BaudRate_9600     = 9600,
+    USAR_BaudRage_19200     = 19200,
+    USAR_BaudRage_38400     = 38400,
+    USAR_BaudRage_115200    = 115200,
+} USART_BaudRate_e;
+
+typedef enum {
+    USAR_OversamplingBy16,
+    USAR_OversamplingBy8,
+} USART_Oversampling_e;
+
+typedef enum {
+    USART_WordLength8Bits,
+    USART_WordLength9Bits,
+} USART_WordLength_e;
+
+typedef enum {
+    USART_ParityControlDisabled,
+    USART_ParityControlEnabled
+} USART_ParityControl_e;
+
+typedef enum {
+    USART_EvenParity,
+    USART_OddParity
+} USART_ParitySelection_e;
+
+typedef enum {
+    USART_StopBits1,        // 1 bit
+    USART_StopBits05,       // 0.5 bits
+    USART_StopBits2,        // 2 bits
+    USART_StopBits15,       // 1.5 bits
+} USART_StopBits_e;
+
+typedef enum {
+    USART_ClockDisabled,
+    USART_ClockEnabled
+} USART_ClkControl_e;
+
+typedef enum {
+    USART_PolarityLOW,
+    USART_PolarityHIGH,
+} USART_CPOL_e;
+
+typedef enum {
+    USART_PhaseFirstEdge,
+    USART_PhaseSecondEdge,
+} USART_CPHA_e;
+
+typedef enum {
+    USART_LastBitLOW,
+    USART_LastBitHIGH,
+} USART_LastBitClockPulse_e;
+
+typedef enum {
+    USART_ThreeSampleBitMethod,             // Used in noisy environments
+    USART_OneSampleBitMethod,               // Used in less noisy environments
+} USART_BitMethod_e;
+
+typedef enum {
+    USART_CTSDisabled,
+    USART_CTSEnabled
+} USART_CTSControl_e;
+
+typedef enum {
+    USART_RTSDisabled,
+    USART_RTSEnabled
+} USART_RTSControl_e;
+
+typedef enum {
+    USART_Disabled,
+    USART_Enabled
+} USART_PwrState;
+
+typedef struct {
+    USART_ClkControl_e ClockControl;
+    USART_CPOL_e CPOL;
+    USART_CPHA_e CPHA;
+    USART_LastBitClockPulse_e LastBitClockPulse;
+} USART_ClkConfig_t;
+
+typedef struct {
+    USART_BaudRate_e BaudRate;
+    USART_Oversampling_e Oversampling;
+    USART_WordLength_e WordLength;
+    USART_ParityControl_e ParityControl;                    // Enabled or disabled parity bit
+    USART_ParitySelection_e ParitySelection;                // Even or Odd
+    USART_StopBits_e StopBits;
+    USART_BitMethod_e BitMethod;
+    USART_CTSControl_e CTSControl;
+    USART_RTSControl_e RTSControl;
+    USART_ClkConfig_t ClockConfig;
+} USART_Config_t;
+
+typedef struct {
+    USART_TypeDef *pUSARTx;
+    USART_Config_t USART_Config;
+} USART_Handle_t;
+
+typedef struct {
+    uint16_t Mantissa;
+    uint8_t Fraction;
+} USART_BaudRateResult_t;
+
+/*
+ * Peripheral control
+ */
+void USART_PeriClockControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
+void USART_PeripheralControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
+USART_PwrState USART_PeripheralEnabled(USART_Handle_t *pUSARTHandle);
+
+/*
+ * Init and De-Init
+ */
+USART_Error_e USART_Init(USART_Handle_t *pUSARTHandle);
+void USART_DeInit(USART_Handle_t *pUSARTHandle);
+
+/*
+ * Data send and receive
+ */
+USART_Error_e USART_SendData(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len);
+USART_Error_e USART_ReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint8_t Len);
+
+USART_Error_e USART_SendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len);
+USART_Error_e USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint8_t Len);
+
+/*
+ * Interrupt config
+ */
+USART_Error_e USART_IRQHandler(USART_Handle_t *pUSARTHandle);
+
+/*
+ * Application callback
+ */
+void USART_ApplicationCallback(USART_Handle_t *pUSARTHandle, USART_Event_e AppEvent);
+
+#endif //USART_DRIVER_H

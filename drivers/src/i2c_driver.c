@@ -440,7 +440,7 @@ void I2C_IRQErrorHandling(I2C_Handle_t *pI2CHandle) {
     }
 }
 
-__weak void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEvent) {}
+__weak void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, I2C_Event_e AppEvent) {}
 
 uint32_t get_pclk1_clock() {
     uint32_t srcFreq = 0;

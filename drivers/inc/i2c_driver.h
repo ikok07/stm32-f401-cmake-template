@@ -168,6 +168,6 @@ void I2C_IRQErrorHandling(I2C_Handle_t *pI2CHandle);
 /*
  * Application callback
  */
-void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, uint8_t AppEvent);
+void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, I2C_Event_e AppEvent);
 
 #endif //I2C_DRIVER_H
