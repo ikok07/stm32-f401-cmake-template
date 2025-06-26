@@ -7,11 +7,15 @@
 
 #include "stm32f4xx.h"
 
+#define USART_INDEX_TO_IRQ_NUMBER(perIndex)             perIndex == 1 ? USART1_IRQn : perIndex == 2 ? USART2_IRQn : perIndex == 6 ? USART6_IRQn : USART1_IRQn
+
 /* ------------ ERROR CODES ------------ */
 
 typedef enum {
     USART_ErrOK,
-    USART_ErrInvalidBaudRate
+    USART_ErrArgumentNULL,
+    USART_ErrInvalidBaudRate,
+    USART_PerBusy
 } USART_Error_e;
 
 /* ------------ CONFIG STRUCTURES ------------ */
@@ -21,6 +25,13 @@ typedef enum {
     USART_EventRxComplete,
     USART_EventDataRequest,                   // when the slave sends data to master
     USART_EventDataReceive,                   // when the master sends data to the slave
+    USART_EventCTS,
+    USART_EventOverrunDetected,
+    USART_EventIdleDetected,
+    USART_EventParityError,
+    USART_EventBreakFlag,
+    USART_EventNoiseFlag,
+    USART_EventFramingError,
 } USART_Event_e;
 
 typedef enum {
@@ -97,6 +108,42 @@ typedef enum {
     USART_Enabled
 } USART_PwrState;
 
+typedef enum {
+    USART_InterruptTXEmpty,
+    USART_InterruptTXComplete,
+    USART_InterruptRXNotEmpty,              // Includes RXNE and ORE flags
+    USART_InterruptCTS,
+    USART_InterruptIdleLine,
+    USART_InterruptParityErr,
+    USART_InterruptBreakFlag,
+    USART_InterruptGenericErrors            // Includes Noise, Overrun and Framing flags
+} USART_Interrupt_e;
+
+typedef enum {
+    USART_InterruptReady,
+    USART_InterruptTXBusy,
+    USART_InterruptRXBusy,
+} USART_InterruptState_e;
+
+// WARNING: The order of these flag SHOULD be EXACTLY like that due to the placement in status register
+typedef enum {
+    USART_FlagPE,
+    USART_FlagFE,
+    USART_FlagNF,
+    USART_FlagORE,
+    USART_FlagIDLE,
+    USART_FlagRXNE,
+    USART_FlagTC,
+    USART_FlagTXE,
+    USART_FlagLBD,
+    USART_FlagCTS,
+} USART_Flag_e;
+
+typedef enum {
+    USART_FlagDisabled,
+    USART_FlagEnabled,
+} USART_FlagStatus_e;
+
 typedef struct {
     USART_ClkControl_e ClockControl;
     USART_CPOL_e CPOL;
@@ -118,8 +165,18 @@ typedef struct {
 } USART_Config_t;
 
 typedef struct {
+    uint8_t *pTXBuffer;
+    uint8_t *pRXBuffer;
+    uint32_t TxLen;
+    uint32_t RxLen;
+    uint32_t RxLenOriginal;
+    USART_InterruptState_e InterruptState;
+} USART_ITState;
+
+typedef struct {
     USART_TypeDef *pUSARTx;
     USART_Config_t USART_Config;
+    USART_ITState USART_ITState;
 } USART_Handle_t;
 
 typedef struct {
@@ -132,6 +189,8 @@ typedef struct {
  */
 void USART_PeriClockControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
 void USART_PeripheralControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
+void USART_PeripheralTXControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
+void USART_PeripheralRXControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
 USART_PwrState USART_PeripheralEnabled(USART_Handle_t *pUSARTHandle);
 
 /*
@@ -144,6 +203,7 @@ void USART_DeInit(USART_Handle_t *pUSARTHandle);
  * Data send and receive
  */
 USART_Error_e USART_SendData(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len);
+void USART_SendBreak(USART_Handle_t *pUSARTHandle);
 USART_Error_e USART_ReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint8_t Len);
 
 USART_Error_e USART_SendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len);
@@ -152,11 +212,25 @@ USART_Error_e USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuff
 /*
  * Interrupt config
  */
-USART_Error_e USART_IRQHandler(USART_Handle_t *pUSARTHandle);
+
+USART_Error_e USART_IRQEnable(USART_Handle_t *pUSARTHandle, USART_Interrupt_e *EnabledInterrupts, uint8_t Len);
+void USART_IRQDisable(USART_Handle_t *pUSARTHandle);
+void USART_IRQHandler(USART_Handle_t *pUSARTHandle);
+
+/*
+ * Hardware flow control
+ */
+void USART_CTSControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
+void USART_RSSControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
+
+/*
+ * Other methods
+ */
+USART_FlagStatus_e USART_GetFlag(USART_Handle_t *pUSARTHandle, USART_Flag_e Flag);
 
 /*
  * Application callback
  */
-void USART_ApplicationCallback(USART_Handle_t *pUSARTHandle, USART_Event_e AppEvent);
+void USART_ApplicationEventCallback(USART_Handle_t *pUSARTHandle, USART_Event_e AppEvent);
 
 #endif //USART_DRIVER_H

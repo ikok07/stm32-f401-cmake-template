@@ -1,6 +1,7 @@
 
 #include <bme280_i2c_driver.h>
 #include <i2c_driver.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "stm32f4xx.h"
@@ -60,6 +61,10 @@ void SystemInit() {
     // Enable FPU
     SCB->CPACR |= 0xF << 20;
 }
+
+int __io_putchar(int ch) {
+    return ch;
+};
 
 int main(void) {
     // Init the LED

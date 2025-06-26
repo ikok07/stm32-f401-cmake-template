@@ -5,6 +5,7 @@
 #include "usart_driver.h"
 
 #include <commons.h>
+#include <stddef.h>
 
 static uint32_t get_pclk1_clock();
 static USART_BaudRateResult_t calc_baud_rate(USART_Handle_t *pUSARTHandle);
@@ -44,6 +45,32 @@ void USART_PeripheralControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled) {
         pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_UE_Pos);
     } else {
         pUSARTHandle->pUSARTx->CR1 &=~ (1 << USART_CR1_UE_Pos);
+    }
+}
+
+/**
+ * @brief Controls the power state of the USART transmitter
+ * @param pUSARTHandle USART Handle
+ * @param Enabled If the peripheral should be enabled or disabled
+ */
+void USART_PeripheralTXControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled) {
+    if (Enabled) {
+        pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TE_Pos);
+    } else {
+        pUSARTHandle->pUSARTx->CR1 &=~ (1 << USART_CR1_TE_Pos);
+    }
+}
+
+/**
+ * @brief Controls the power state of the USART receiver
+ * @param pUSARTHandle USART Handle
+ * @param Enabled If the peripheral should be enabled or disabled
+ */
+void USART_PeripheralRXControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled) {
+    if (Enabled) {
+        pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_RE_Pos);
+    } else {
+        pUSARTHandle->pUSARTx->CR1 &=~ (1 << USART_CR1_RE_Pos);
     }
 }
 
@@ -122,6 +149,272 @@ void USART_DeInit(USART_Handle_t *pUSARTHandle) {
     USART_PeriClockControl(pUSARTHandle, DISABLE);
 }
 
+/**
+ * @brief Sends data via USART peripheral
+ * @note This is a blocking method
+ * @param pUSARTHandle USART Handle
+ * @param pTXBuffer The buffer which needs to be sent
+ * @param Len The length of the buffer
+ * @return USART_ErrOK if successful
+ */
+USART_Error_e USART_SendData(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len) {
+    while (Len > 0) {
+        // Wait for empty tx buffer
+        while (!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TXE_Pos))) {}
+
+        pUSARTHandle->pUSARTx->DR = *pTXBuffer++;
+    }
+
+    // Wait for transfer complete
+    while (!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TC_Pos)));
+
+    return USART_ErrOK;
+}
+
+/**
+ * @brief Sends USART break signal
+ * @note This is a blocking method
+ * @param pUSARTHandle USART Handle
+ */
+void USART_SendBreak(USART_Handle_t *pUSARTHandle) {
+    pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_SBK_Pos);
+}
+
+/**
+ * @brief Receives data via USART peripheral
+ * @note This is a blocking method
+ * @param pUSARTHandle USART Handle
+ * @param pRXBuffer The buffer where the received data is stored
+ * @param Len The length of the buffer
+ * @return USART_ErrOK if successful
+ */
+USART_Error_e USART_ReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint8_t Len) {
+    uint32_t originalLen = Len;
+    while (Len > 0) {
+        // Wait for data reception
+        while (!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_RXNE_Pos)));
+
+        pRXBuffer[originalLen - Len] = pUSARTHandle->pUSARTx->DR;
+        Len--;
+    }
+
+    return USART_ErrOK;
+}
+
+/**
+ * @brief Configures the USASRT interrupt state for transmission
+ * @note The peripheral must be correctly setup for interrupt transmission before calling this method
+ * @param pUSARTHandle USART handle
+ * @param pTXBuffer The buffer which needs to be sent
+ * @param Len The length of the buffer
+ */
+USART_Error_e USART_SendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len) {
+    if (Len == 0) return;
+    if (pUSARTHandle->USART_ITState.InterruptState != USART_InterruptReady) return USART_PerBusy;
+
+    pUSARTHandle->USART_ITState.pTXBuffer = pTXBuffer;
+    pUSARTHandle->USART_ITState.TxLen = Len;
+    pUSARTHandle->USART_ITState.InterruptState = USART_InterruptTXBusy;
+
+    // Enable interrupt
+    pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TXEIE_Pos);
+
+    return USART_ErrOK;
+}
+
+/**
+ * @brief Configures the USASRT interrupt state for reception
+ * @note The peripheral must be correctly setup for interrupt reception before calling this method
+ * @param pUSARTHandle USART handle
+ * @param pRXBuffer The buffer where to store the data
+ * @param Len The length of the buffer
+ */
+USART_Error_e USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint8_t Len) {
+    if (Len == 0) return;
+    if (pUSARTHandle->USART_ITState.InterruptState != USART_InterruptReady) return USART_PerBusy;
+
+    pUSARTHandle->USART_ITState.pRXBuffer = pRXBuffer;
+    pUSARTHandle->USART_ITState.RxLen = Len;
+    pUSARTHandle->USART_ITState.InterruptState = USART_InterruptRXBusy;
+
+    // Enable interrupt
+    pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_RXNEIE_Pos);
+
+    return USART_ErrOK;
+}
+
+/**
+ *
+ * @param pUSARTHandle USART handle
+ * @param EnabledInterrupts An array of interrupts which should be enabled
+ * @param Len The length of the enabledInterrupts array
+ * @return USART_ErrOK - success. USART_ErrArgumentNULL - EnabledInterrupts is NULL.
+ */
+USART_Error_e USART_IRQEnable(USART_Handle_t *pUSARTHandle, USART_Interrupt_e *EnabledInterrupts, uint8_t Len) {
+    if (EnabledInterrupts == NULL) return USART_ErrArgumentNULL;
+    if (Len == 0) return USART_ErrOK;
+
+    uint8_t perIndex = 1;
+    if (pUSARTHandle->pUSARTx == USART2) perIndex = 2;
+    else if (pUSARTHandle->pUSARTx == USART6) perIndex = 6;
+
+    uint8_t irqNumber = USART_INDEX_TO_IRQ_NUMBER(perIndex);
+    NVIC_EnableIRQ(irqNumber);
+
+    while (Len > 0) {
+        switch (*EnabledInterrupts++) {
+            case USART_InterruptTXEmpty:
+                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TXEIE_Pos);
+            break;
+            case USART_InterruptTXComplete:
+                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TCIE_Pos);
+            break;
+            case USART_InterruptRXNotEmpty:
+                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_RXNEIE_Pos);
+            break;
+            case USART_InterruptCTS:
+                pUSARTHandle->pUSARTx->CR3 |= (1 << USART_CR3_CTSIE_Pos);
+            break;
+            case USART_InterruptIdleLine:
+                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_IDLEIE_Pos);
+            break;
+            case USART_InterruptParityErr:
+                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_PEIE_Pos);
+            break;
+            case USART_InterruptBreakFlag:
+                pUSARTHandle->pUSARTx->CR2 |= (1 << USART_CR2_LBDIE_Pos);
+            break;
+            case USART_InterruptGenericErrors:
+                pUSARTHandle->pUSARTx->CR3 |= (1 << USART_CR3_EIE_Pos);
+            break;
+        }
+        Len--;
+    }
+
+    return USART_ErrOK;
+}
+
+/**
+ * @brief Disables all USART interrupts
+ * @param pUSARTHandle USART handle
+ */
+void USART_IRQDisable(USART_Handle_t *pUSARTHandle) {
+    uint8_t perIndex = 1;
+    if (pUSARTHandle->pUSARTx == USART2) perIndex = 2;
+    else if (pUSARTHandle->pUSARTx == USART6) perIndex = 6;
+
+    uint8_t irqNumber = USART_INDEX_TO_IRQ_NUMBER(perIndex);
+    NVIC_DisableIRQ(irqNumber);
+}
+
+void USART_IRQHandler(USART_Handle_t *pUSARTHandle) {
+
+    // TX empty flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagTXE) && pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_TXEIE_Pos)) {
+        if (pUSARTHandle->USART_ITState.TxLen > 0) {
+            pUSARTHandle->pUSARTx->DR = *pUSARTHandle->USART_ITState.pTXBuffer++;
+            pUSARTHandle->USART_ITState.TxLen--;
+
+            if (pUSARTHandle->USART_ITState.TxLen == 0) {
+                pUSARTHandle->pUSARTx->CR1 &=~ (1 << USART_CR1_TXEIE_Pos);
+                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TCIE_Pos);
+            }
+        }
+    }
+
+    // CTS flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagCTS) && pUSARTHandle->pUSARTx->CR3 & (1 << USART_CR3_CTSIE_Pos)) {
+        pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_CTS_Pos);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EventCTS);
+    }
+
+    // Tx complete flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagTC) && pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_TCIE_Pos)) {
+        if (pUSARTHandle->USART_ITState.TxLen == 0) {
+            pUSARTHandle->pUSARTx->CR1 &=~ (1 << USART_CR1_TCIE_Pos);
+            pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_TC_Pos);
+            pUSARTHandle->USART_ITState.InterruptState = USART_InterruptReady;
+            USART_ApplicationEventCallback(pUSARTHandle, USART_EventTxComplete);
+        }
+    }
+
+    // RX not empty flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagRXNE) && pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_RXNEIE_Pos)) {
+        if (pUSARTHandle->USART_ITState.RxLen > 0) {
+            uint32_t originalLen = pUSARTHandle->USART_ITState.RxLenOriginal;
+            uint32_t len = pUSARTHandle->USART_ITState.RxLen;
+            pUSARTHandle->USART_ITState.pRXBuffer[originalLen - len] = pUSARTHandle->pUSARTx->DR;
+            pUSARTHandle->USART_ITState.RxLen--;
+        } else {
+            pUSARTHandle->USART_ITState.InterruptState = USART_InterruptReady;
+            pUSARTHandle->pUSARTx->CR1 &=~ (1 << USART_CR1_RXNEIE_Pos);
+            USART_ApplicationEventCallback(pUSARTHandle, USART_EventRxComplete);
+        }
+    }
+
+    // Overrun flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagORE) && (pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_RXNEIE_Pos) || pUSARTHandle->pUSARTx->CR3 & (1 << USART_CR3_EIE_Pos))) {
+        pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_ORE_Pos);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EventOverrunDetected);
+    }
+
+    // IDLE flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagIDLE) && pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_IDLEIE_Pos)) {
+        pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_IDLE_Pos);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EventIdleDetected);
+    }
+
+    // Parity error flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagPE) && pUSARTHandle->pUSARTx->CR1 & (1 << USART_CR1_PEIE_Pos)) {
+        pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_PE_Pos);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EventParityError);
+    }
+
+    // Break flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagLBD) && pUSARTHandle->pUSARTx->CR2 & (1 << USART_CR2_LBDIE_Pos)) {
+        pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_LBD_Pos);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EventBreakFlag);
+    }
+
+    // Noise flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagNF) && pUSARTHandle->pUSARTx->CR3 & (1 << USART_CR3_EIE_Pos)) {
+        pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_NE_Pos);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EventNoiseFlag);
+    }
+
+    // Framing error flag
+    if (USART_GetFlag(pUSARTHandle, USART_FlagFE) && pUSARTHandle->pUSARTx->CR3 & (1 << USART_CR3_EIE_Pos)) {
+        pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_FE_Pos);
+        USART_ApplicationEventCallback(pUSARTHandle, USART_EventFramingError);
+    }
+}
+
+void USART_CTSControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled) {
+    if (Enabled) {
+        pUSARTHandle->pUSARTx->CR3 |= (1 << USART_CR3_CTSE_Pos);
+    } else {
+        pUSARTHandle->pUSARTx->CR3 &=~ (1 << USART_CR3_CTSE_Pos);
+    }
+}
+
+void USART_RSSControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled) {
+    if (Enabled) {
+        pUSARTHandle->pUSARTx->CR3 |= (1 << USART_CR3_RTSE_Pos);
+    } else {
+        pUSARTHandle->pUSARTx->CR3 &=~ (1 << USART_CR3_RTSE_Pos);
+    }
+}
+
+/**
+ * @brief Gets the current state of the flag in the status register
+ * @param pUSARTHandle USART handle
+ * @param Flag Flag to read
+ * @return Enabled or disabled flag
+ */
+USART_FlagStatus_e USART_GetFlag(USART_Handle_t *pUSARTHandle, USART_Flag_e Flag) {
+    return pUSARTHandle->pUSARTx->SR & (1 << Flag) ? 1 : 0;
+}
+
 uint32_t get_pclk1_clock() {
     uint32_t srcFreq = 0;
     uint8_t swsValue = (RCC->CFGR >> RCC_CFGR_SWS_Pos) & RCC_CFGR_SWS_Msk;
@@ -164,4 +457,4 @@ USART_BaudRateResult_t calc_baud_rate(USART_Handle_t *pUSARTHandle) {
     return result;
 }
 
-
+__weak void USART_ApplicationEventCallback(USART_Handle_t *pUSARTHandle, USART_Event_e AppEvent) {}
