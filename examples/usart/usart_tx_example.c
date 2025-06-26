@@ -1,3 +1,6 @@
+//
+// Created by Kok on 6/26/25.
+//
 
 #include <string.h>
 
@@ -24,7 +27,6 @@
 #define USART_RTS           12
 
 volatile uint8_t button_trigger = 0;
-uint8_t buffer[255];
 uint8_t err;
 
 GPIO_Handle_t gpioHandle = {
@@ -48,14 +50,14 @@ USART_Handle_t usartHandle = {
         .ParitySelection = USART_EvenParity,
         .StopBits = USART_StopBits1,
         .WordLength = USART_WordLength8Bits,
-        .CTSControl = USART_CTSDisabled,
-        .RTSControl = USART_RTSDisabled,
+        .CTSControl = USART_CTSDisabled,        // Optional
+        .RTSControl = USART_RTSDisabled,        // Optional
         .ClockConfig = {
             // Optional clock provider
-            .ClockControl = USART_ClockDisabled,
-            // .CPHA = USART_PhaseFirstEdge,
-            // .CPOL = USART_PolarityLOW,
-            // .LastBitClockPulse = USART_LastBitLOW
+            .ClockControl = USART_ClockEnabled,
+            .CPHA = USART_PhaseFirstEdge,
+            .CPOL = USART_PolarityLOW,
+            .LastBitClockPulse = USART_LastBitLOW
         }
     }
 };
@@ -72,18 +74,15 @@ int main(void) {
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
-    // // Init USART CK
-    // gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_CK;
-    // gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
-    // gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAlternate;
-    // gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF7;
-    // GPIO_Init(&gpioHandle);
-
-    // Init USART TX
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_TX;
+    // Init USART CK
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_CK;
     gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
     gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAlternate;
     gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF7;
+    GPIO_Init(&gpioHandle);
+
+    // Init USART TX
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_TX;
     GPIO_Init(&gpioHandle);
     //
     // // Init USART RX
@@ -101,6 +100,7 @@ int main(void) {
     USART_PeriClockControl(&usartHandle, ENABLE);
     USART_Init(&usartHandle);
     USART_PeripheralControl(&usartHandle, ENABLE);
+    USART_PeripheralTXControl(&usartHandle, ENABLE);
 
     // TX interrupts will be enabled when calling the send method
     USART_IRQEnable(&usartHandle, NULL, 0);
@@ -110,14 +110,10 @@ int main(void) {
             // Small delay because of debouncing
             for (int i = 0; i < 1000000; i++);
 
-            // char *msg = "Hello, from STM32!";
-            // USART_PeripheralTXControl(&usartHandle, ENABLE);
-            USART_PeripheralRXControl(&usartHandle, ENABLE);
+            uint8_t data = 3;
 
-            // USART_SendData(&usartHandle, (uint8_t*)msg, strlen(msg) + 1); // Polling method
-            // USART_SendDataIT(&usartHandle, (uint8_t*)msg, strlen(msg) + 1);
-            // while (usartHandle.USART_ITState.InterruptState != USART_InterruptStateReady);
-            USART_ReceiveDataIT(&usartHandle, buffer, 255);
+            // USART_SendData(&usartHandle, &data, sizeof(data)); // Polling method
+            USART_SendDataIT(&usartHandle, &data, sizeof(data));
 
             button_trigger = 0;
         }
@@ -137,12 +133,6 @@ void USART_ApplicationEventCallback(USART_Handle_t *pUSARTHandle, USART_Event_e 
     switch (AppEvent) {
         case USART_EventTxComplete:
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
-            USART_PeripheralTXControl(&usartHandle, DISABLE);
-        break;
-        case USART_EventIdleDetected:
-            uint8_t actualLen = sizeof(buffer) - pUSARTHandle->USART_ITState.RxLen;
-            (void)actualLen;
-            USART_PeripheralRXControl(&usartHandle, DISABLE);
         break;
         default:
         break;

@@ -43,10 +43,10 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle) {
     } else {
         // Configure rising / falling edge
         if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_ModeInputREdge) {
-            EXTI->FTSR &=~ 1 << pinNumber;
+            EXTI->FTSR &=~ (1 << pinNumber);
             EXTI->RTSR |= 1 << pinNumber;
         } else if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode == GPIO_ModeInputFEdge) {
-            EXTI->RTSR &=~ 1 << pinNumber;
+            EXTI->RTSR &=~ (1 << pinNumber);
             EXTI->FTSR |= 1 << pinNumber;
         } else {
             EXTI->RTSR |= 1 << pinNumber;
@@ -60,15 +60,15 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle) {
     }
 
     // GPIO Speed Configuration
-    pGPIOHandle->pGPIOx->OSPEEDR &=~ 0b11 << (2 * pinNumber);
+    pGPIOHandle->pGPIOx->OSPEEDR &=~ (0b11 << (2 * pinNumber));
     pGPIOHandle->pGPIOx->OSPEEDR |= pGPIOHandle->GPIO_PinConfig.GPIO_PinSpeed << (2 * pinNumber);
 
     // GPIO Pull Up & Pull Down Configuration
-    pGPIOHandle->pGPIOx->PUPDR &=~ 0b11 << (2 * pinNumber);
+    pGPIOHandle->pGPIOx->PUPDR &=~ (0b11 << (2 * pinNumber));
     pGPIOHandle->pGPIOx->PUPDR |= pGPIOHandle->GPIO_PinConfig.GPIO_PinPuPdControl << (2 * pinNumber);
 
     // GPIO Output Type Configuration
-    pGPIOHandle->pGPIOx->OTYPER &=~ 0b01 << pinNumber;
+    pGPIOHandle->pGPIOx->OTYPER &=~ (0b01 << pinNumber);
     pGPIOHandle->pGPIOx->OTYPER |= pGPIOHandle->GPIO_PinConfig.GPIO_PinOPType << pinNumber;
 
     // GPI Alternate Function Configuration

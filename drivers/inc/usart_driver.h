@@ -23,8 +23,6 @@ typedef enum {
 typedef enum {
     USART_EventTxComplete,
     USART_EventRxComplete,
-    USART_EventDataRequest,                   // when the slave sends data to master
-    USART_EventDataReceive,                   // when the master sends data to the slave
     USART_EventCTS,
     USART_EventOverrunDetected,
     USART_EventIdleDetected,
@@ -42,8 +40,8 @@ typedef enum {
 } USART_BaudRate_e;
 
 typedef enum {
-    USAR_OversamplingBy16,
-    USAR_OversamplingBy8,
+    USART_OversamplingBy16,
+    USART_OversamplingBy8,
 } USART_Oversampling_e;
 
 typedef enum {
@@ -120,9 +118,9 @@ typedef enum {
 } USART_Interrupt_e;
 
 typedef enum {
-    USART_InterruptReady,
-    USART_InterruptTXBusy,
-    USART_InterruptRXBusy,
+    USART_InterruptStateReady,
+    USART_InterruptStateTXBusy,
+    USART_InterruptStateRXBusy,
 } USART_InterruptState_e;
 
 // WARNING: The order of these flag SHOULD be EXACTLY like that due to the placement in status register

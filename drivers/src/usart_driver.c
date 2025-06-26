@@ -22,7 +22,7 @@ void USART_PeriClockControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled) {
         } else if (pUSARTHandle->pUSARTx == USART6) {
             RCC->APB2ENR |= (1 << RCC_APB2ENR_USART6EN_Pos);
         } else {
-            RCC->APB2ENR |= (1 << RCC_APB1ENR_USART2EN_Pos);
+            RCC->APB1ENR |= (1 << RCC_APB1ENR_USART2EN_Pos);
         }
     } else {
         if (pUSARTHandle->pUSARTx == USART1) {
@@ -163,6 +163,7 @@ USART_Error_e USART_SendData(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, u
         while (!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TXE_Pos))) {}
 
         pUSARTHandle->pUSARTx->DR = *pTXBuffer++;
+        Len--;
     }
 
     // Wait for transfer complete
@@ -209,12 +210,12 @@ USART_Error_e USART_ReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer
  * @param Len The length of the buffer
  */
 USART_Error_e USART_SendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len) {
-    if (Len == 0) return;
-    if (pUSARTHandle->USART_ITState.InterruptState != USART_InterruptReady) return USART_PerBusy;
+    if (Len == 0) return USART_ErrOK;
+    if (pUSARTHandle->USART_ITState.InterruptState != USART_InterruptStateReady) return USART_PerBusy;
 
     pUSARTHandle->USART_ITState.pTXBuffer = pTXBuffer;
     pUSARTHandle->USART_ITState.TxLen = Len;
-    pUSARTHandle->USART_ITState.InterruptState = USART_InterruptTXBusy;
+    pUSARTHandle->USART_ITState.InterruptState = USART_InterruptStateTXBusy;
 
     // Enable interrupt
     pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TXEIE_Pos);
@@ -230,12 +231,12 @@ USART_Error_e USART_SendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer,
  * @param Len The length of the buffer
  */
 USART_Error_e USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint8_t Len) {
-    if (Len == 0) return;
-    if (pUSARTHandle->USART_ITState.InterruptState != USART_InterruptReady) return USART_PerBusy;
+    if (Len == 0) return USART_ErrOK;
+    if (pUSARTHandle->USART_ITState.InterruptState != USART_InterruptStateReady) return USART_PerBusy;
 
     pUSARTHandle->USART_ITState.pRXBuffer = pRXBuffer;
     pUSARTHandle->USART_ITState.RxLen = Len;
-    pUSARTHandle->USART_ITState.InterruptState = USART_InterruptRXBusy;
+    pUSARTHandle->USART_ITState.InterruptState = USART_InterruptStateRXBusy;
 
     // Enable interrupt
     pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_RXNEIE_Pos);
@@ -251,9 +252,6 @@ USART_Error_e USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuff
  * @return USART_ErrOK - success. USART_ErrArgumentNULL - EnabledInterrupts is NULL.
  */
 USART_Error_e USART_IRQEnable(USART_Handle_t *pUSARTHandle, USART_Interrupt_e *EnabledInterrupts, uint8_t Len) {
-    if (EnabledInterrupts == NULL) return USART_ErrArgumentNULL;
-    if (Len == 0) return USART_ErrOK;
-
     uint8_t perIndex = 1;
     if (pUSARTHandle->pUSARTx == USART2) perIndex = 2;
     else if (pUSARTHandle->pUSARTx == USART6) perIndex = 6;
@@ -261,34 +259,36 @@ USART_Error_e USART_IRQEnable(USART_Handle_t *pUSARTHandle, USART_Interrupt_e *E
     uint8_t irqNumber = USART_INDEX_TO_IRQ_NUMBER(perIndex);
     NVIC_EnableIRQ(irqNumber);
 
-    while (Len > 0) {
-        switch (*EnabledInterrupts++) {
-            case USART_InterruptTXEmpty:
-                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TXEIE_Pos);
-            break;
-            case USART_InterruptTXComplete:
-                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TCIE_Pos);
-            break;
-            case USART_InterruptRXNotEmpty:
-                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_RXNEIE_Pos);
-            break;
-            case USART_InterruptCTS:
-                pUSARTHandle->pUSARTx->CR3 |= (1 << USART_CR3_CTSIE_Pos);
-            break;
-            case USART_InterruptIdleLine:
-                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_IDLEIE_Pos);
-            break;
-            case USART_InterruptParityErr:
-                pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_PEIE_Pos);
-            break;
-            case USART_InterruptBreakFlag:
-                pUSARTHandle->pUSARTx->CR2 |= (1 << USART_CR2_LBDIE_Pos);
-            break;
-            case USART_InterruptGenericErrors:
-                pUSARTHandle->pUSARTx->CR3 |= (1 << USART_CR3_EIE_Pos);
-            break;
+    if (Len > 0 && EnabledInterrupts != NULL) {
+        while (Len > 0) {
+            switch (*EnabledInterrupts++) {
+                case USART_InterruptTXEmpty:
+                    pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TXEIE_Pos);
+                break;
+                case USART_InterruptTXComplete:
+                    pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_TCIE_Pos);
+                break;
+                case USART_InterruptRXNotEmpty:
+                    pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_RXNEIE_Pos);
+                break;
+                case USART_InterruptCTS:
+                    pUSARTHandle->pUSARTx->CR3 |= (1 << USART_CR3_CTSIE_Pos);
+                break;
+                case USART_InterruptIdleLine:
+                    pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_IDLEIE_Pos);
+                break;
+                case USART_InterruptParityErr:
+                    pUSARTHandle->pUSARTx->CR1 |= (1 << USART_CR1_PEIE_Pos);
+                break;
+                case USART_InterruptBreakFlag:
+                    pUSARTHandle->pUSARTx->CR2 |= (1 << USART_CR2_LBDIE_Pos);
+                break;
+                case USART_InterruptGenericErrors:
+                    pUSARTHandle->pUSARTx->CR3 |= (1 << USART_CR3_EIE_Pos);
+                break;
+            }
+            Len--;
         }
-        Len--;
     }
 
     return USART_ErrOK;
@@ -333,7 +333,7 @@ void USART_IRQHandler(USART_Handle_t *pUSARTHandle) {
         if (pUSARTHandle->USART_ITState.TxLen == 0) {
             pUSARTHandle->pUSARTx->CR1 &=~ (1 << USART_CR1_TCIE_Pos);
             pUSARTHandle->pUSARTx->SR &=~ (1 << USART_SR_TC_Pos);
-            pUSARTHandle->USART_ITState.InterruptState = USART_InterruptReady;
+            pUSARTHandle->USART_ITState.InterruptState = USART_InterruptStateReady;
             USART_ApplicationEventCallback(pUSARTHandle, USART_EventTxComplete);
         }
     }
@@ -346,7 +346,7 @@ void USART_IRQHandler(USART_Handle_t *pUSARTHandle) {
             pUSARTHandle->USART_ITState.pRXBuffer[originalLen - len] = pUSARTHandle->pUSARTx->DR;
             pUSARTHandle->USART_ITState.RxLen--;
         } else {
-            pUSARTHandle->USART_ITState.InterruptState = USART_InterruptReady;
+            pUSARTHandle->USART_ITState.InterruptState = USART_InterruptStateReady;
             pUSARTHandle->pUSARTx->CR1 &=~ (1 << USART_CR1_RXNEIE_Pos);
             USART_ApplicationEventCallback(pUSARTHandle, USART_EventRxComplete);
         }
@@ -448,7 +448,7 @@ USART_BaudRateResult_t calc_baud_rate(USART_Handle_t *pUSARTHandle) {
         .Mantissa = mantissa & 0xFFF
     };
 
-    if (pUSARTHandle->USART_Config.Oversampling == USAR_OversamplingBy8) {
+    if (pUSARTHandle->USART_Config.Oversampling == USART_OversamplingBy8) {
         result.Fraction = ((fraction * 8) / 100) & 0x7;       // mask with 0b111
     } else {
         result.Fraction = ((fraction * 16) / 100) & 0xF;       // mask with 0b1111
