@@ -15,7 +15,8 @@ typedef enum {
     USART_ErrOK,
     USART_ErrArgumentNULL,
     USART_ErrInvalidBaudRate,
-    USART_PerBusy
+    USART_PerBusy,
+    USART_FPUNotEnabled
 } USART_Error_e;
 
 /* ------------ CONFIG STRUCTURES ------------ */
@@ -182,6 +183,8 @@ typedef struct {
     uint8_t Fraction;
 } USART_BaudRateResult_t;
 
+/* ------------ METHODS ------------ */
+
 /*
  * Peripheral control
  */
@@ -200,18 +203,18 @@ void USART_DeInit(USART_Handle_t *pUSARTHandle);
 /*
  * Data send and receive
  */
-USART_Error_e USART_SendData(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len);
+USART_Error_e USART_SendData(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint32_t Len);
 void USART_SendBreak(USART_Handle_t *pUSARTHandle);
-USART_Error_e USART_ReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint8_t Len);
+USART_Error_e USART_ReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint32_t Len);
 
-USART_Error_e USART_SendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint8_t Len);
-USART_Error_e USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint8_t Len);
+USART_Error_e USART_SendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint32_t Len);
+USART_Error_e USART_ReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer, uint32_t Len);
 
 /*
  * Interrupt config
  */
 
-USART_Error_e USART_IRQEnable(USART_Handle_t *pUSARTHandle, USART_Interrupt_e *EnabledInterrupts, uint8_t Len);
+USART_Error_e USART_IRQEnable(USART_Handle_t *pUSARTHandle, USART_Interrupt_e *EnabledInterrupts, uint32_t Len);
 void USART_IRQDisable(USART_Handle_t *pUSARTHandle);
 void USART_IRQHandler(USART_Handle_t *pUSARTHandle);
 
@@ -224,7 +227,10 @@ void USART_RSSControl(USART_Handle_t *pUSARTHandle, uint8_t Enabled);
 /*
  * Other methods
  */
+USART_Error_e USART_SetBaudRate(USART_Handle_t *pUSARTHandle, USART_BaudRate_e BaudRate);
+
 USART_FlagStatus_e USART_GetFlag(USART_Handle_t *pUSARTHandle, USART_Flag_e Flag);
+void USART_ClearFlag(USART_Handle_t *pUSARTHandle, USART_Flag_e Flag);
 
 /*
  * Application callback

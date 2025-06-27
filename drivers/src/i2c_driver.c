@@ -4,9 +4,9 @@
 
 #include "i2c_driver.h"
 
+#include <clock_driver.h>
 #include <commons.h>
 
-static uint32_t get_pclk1_clock();
 static void gen_start_condition(I2C_TypeDef *pI2Cx);
 void clear_addr_flag(I2C_Handle_t *pI2CHandle);
 static void gen_stop_condition(I2C_TypeDef *pI2Cx);
@@ -66,7 +66,7 @@ I2C_Error_e I2C_Init(I2C_Handle_t *pI2CHandle) {
     }
 
     // I2C speed
-    uint32_t pclk1FreqHz = get_pclk1_clock();
+    uint32_t pclk1FreqHz = CLOCK_GetApb1Hz();
     pI2CHandle->pI2Cx->CR2 |= ((pclk1FreqHz / 1000000) << I2C_CR2_FREQ_Pos);
 
     uint16_t clockPeriodNs = (1000000000 / pclk1FreqHz);
@@ -441,26 +441,6 @@ void I2C_IRQErrorHandling(I2C_Handle_t *pI2CHandle) {
 }
 
 __weak void I2C_ApplicationEventCallback(I2C_Handle_t *pI2CHandle, I2C_Event_e AppEvent) {}
-
-uint32_t get_pclk1_clock() {
-    uint32_t srcFreq = 0;
-    uint8_t swsValue = (RCC->CFGR >> RCC_CFGR_SWS_Pos) & RCC_CFGR_SWS_Msk;
-    if (swsValue == 0) srcFreq = 16000000; // HSI
-    else if (swsValue == 1) srcFreq = HSE_VALUE; // HSE
-    else if (swsValue == 2) {/* To be implemented... */} // PLL
-    else return -1;
-
-    uint8_t ahbPresc = 1;
-    uint8_t hpreValue = (RCC->CFGR >> RCC_CFGR_HPRE_Pos) & RCC_CFGR_HPRE_Msk;
-    if (hpreValue >= 8 && hpreValue <= 15) ahbPresc = 1 << (hpreValue - 7);
-
-    uint8_t apb1Presc = 1;
-    uint8_t ppre1Value = (RCC->CFGR >> RCC_CFGR_PPRE1_Pos) & RCC_CFGR_PPRE1_Msk;
-    if (ppre1Value >= 4 && ppre1Value <= 7) apb1Presc = 1 << (ppre1Value - 3);
-
-
-    return srcFreq / (ahbPresc * apb1Presc);
-}
 
 void gen_start_condition(I2C_TypeDef *pI2Cx) {
     pI2Cx->CR1 |= (1 << I2C_CR1_START_Pos);

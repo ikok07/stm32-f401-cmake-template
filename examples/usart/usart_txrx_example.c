@@ -1,5 +1,8 @@
-#include <clock_driver.h>
-#include <stdio.h>
+//
+// Created by Kok on 6/27/25.
+//
+
+
 #include <string.h>
 
 #include "stm32f4xx.h"
@@ -68,23 +71,7 @@ int __io_putchar(int ch) {
     return ch;
 };
 
-// void SystemInit() {
-
-// }
-
 int main(void) {
-
-    // HCLK - 32MHz; APB1 - 32 MHz; APB2 - 16 MHz
-
-    // CLOCK_SelectSysClock(CLOCK_SysClockHSI);
-    // CLOCK_Disable(CLOCK_SrcPLL);
-    // CLOCK_SetPLLFactors(8, 128, CLOCK_PLLSysClkPresc4);
-    // CLOCK_Enable(CLOCK_SrcPLL);
-    // CLOCK_SelectSysClock(CLOCK_SysClockPLL);
-    // CLOCK_SetAHBBusPrescaler(CLOCK_AHBPresc2);
-    // CLOCK_SetAPBBusPrescaler(CLOCK_BusAPB1, CLOCK_APBPresc1);
-    // CLOCK_SetAPBBusPrescaler(CLOCK_BusAPB2, CLOCK_APBPresc2);
-
     // Init the LED
     GPIO_Init(&gpioHandle);
 
@@ -95,6 +82,13 @@ int main(void) {
     gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeInputFEdge;
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
+
+    // // Init USART CK
+    // gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_CK;
+    // gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
+    // gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAlternate;
+    // gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF7;
+    // GPIO_Init(&gpioHandle);
 
     // Init USART TX
     gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_TX;
@@ -107,26 +101,71 @@ int main(void) {
     gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_RX;
     GPIO_Init(&gpioHandle);
 
+    // Init USART CTS
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_CTS;
+    GPIO_Init(&gpioHandle);
+
+    // Init USART RTS
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_RTS;
+    GPIO_Init(&gpioHandle);
+
     USART_PeriClockControl(&usartHandle, ENABLE);
     USART_Init(&usartHandle);
     USART_PeripheralControl(&usartHandle, ENABLE);
+
+    // TX interrupts will be enabled when calling the send method
+    USART_Interrupt_e interrupts[1] = {USART_InterruptIdleLine};
+    USART_IRQEnable(&usartHandle, interrupts, sizeof(interrupts));
 
     while (1) {
         if (button_trigger) {
             // Small delay because of debouncing
             for (int i = 0; i < 1000000; i++);
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
-            char *msg = "Hello, from STM32!\n";
+            char *msg = "Hello, from STM32!";
+            USART_PeripheralTXControl(&usartHandle, ENABLE);
+            USART_PeripheralRXControl(&usartHandle, ENABLE);
 
-            printf(msg);
+            // USART_SendData(&usartHandle, (uint8_t*)msg, strlen(msg) + 1); // Polling method
+            USART_SendDataIT(&usartHandle, (uint8_t*)msg, strlen(msg) + 1);
+            while (usartHandle.USART_ITState.InterruptState != USART_InterruptStateReady);
+            USART_ReceiveDataIT(&usartHandle, buffer, sizeof(buffer));
 
             button_trigger = 0;
         }
     };
 }
 
-
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
     button_trigger = 1;
+}
+
+void USART1_IRQHandler() {
+    USART_IRQHandler(&usartHandle);
+}
+
+void USART_ApplicationEventCallback(USART_Handle_t *pUSARTHandle, USART_Event_e AppEvent) {
+    switch (AppEvent) {
+        case USART_EventTxComplete:
+            USART_PeripheralTXControl(&usartHandle, DISABLE);
+        break;
+        case USART_EventRxComplete:
+            USART_PeripheralRXControl(&usartHandle, DISABLE);
+            if (strcmp((char*)pUSARTHandle->USART_ITState.pRXBuffer, "Hello, from Arduino Leonardo!") == 0) {
+                GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+            }
+        case USART_EventIdleDetected:
+            // If the length is lower than the buffer size
+            uint8_t actualLen = sizeof(buffer) - pUSARTHandle->USART_ITState.RxLen;
+            (void)actualLen;
+
+            USART_PeripheralRXControl(&usartHandle, DISABLE);
+            if (strcmp((char*)pUSARTHandle->USART_ITState.pRXBuffer, "Hello, from Arduino Leonardo!") == 0) {
+                GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+            }
+        break;
+        default:
+        break;
+    }
 }

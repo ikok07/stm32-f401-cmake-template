@@ -56,6 +56,7 @@ set (PROJECT_SOURCES
 	drivers/src/i2c_driver.c
 	drivers/src/bme280_i2c_driver.c
 	drivers/src/usart_driver.c
+	drivers/src/clock_driver.c
 )
 
 set (PROJECT_DEFINES
