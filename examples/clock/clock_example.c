@@ -3,12 +3,14 @@
 //
 
 #include "clock_driver.h"
+#include "flash_driver.h"
 
 void SystemInit() {
     // Setup for 84MHz
 
     CLOCK_SelectSysClock(CLOCK_SysClockHSI);
     CLOCK_Disable(CLOCK_SrcPLL);
+    FLASH_SetLatency(FLASH_WaitState1);
     CLOCK_SetPLLFactors(16, 336, CLOCK_PLLSysClkPresc4);
     CLOCK_Enable(CLOCK_SrcPLL);
     CLOCK_SelectSysClock(CLOCK_SysClockPLL);

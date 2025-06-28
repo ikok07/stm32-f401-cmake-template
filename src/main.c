@@ -1,89 +1,63 @@
 #include <clock_driver.h>
-#include <stdio.h>
+#include <flash_driver.h>
+
+void SystemInit() {
+    // HCLK - 64MHz; APB1 - 32 MHz; APB2 - 32 MHz
+
+    CLOCK_SelectSysClock(CLOCK_SysClockHSI);
+    CLOCK_Disable(CLOCK_SrcPLL);
+    FLASH_SetLatency(FLASH_WaitState1);
+    CLOCK_SetPLLFactors(8, 128, CLOCK_PLLSysClkPresc4);
+    CLOCK_Enable(CLOCK_SrcPLL);
+    CLOCK_SelectSysClock(CLOCK_SysClockPLL);
+    CLOCK_SetAHBBusPrescaler(CLOCK_AHBPresc1);
+    CLOCK_SetAPBBusPrescaler(CLOCK_BusAPB1, CLOCK_APBPresc2);
+    CLOCK_SetAPBBusPrescaler(CLOCK_BusAPB2, CLOCK_APBPresc2);
+}
+
+#include <i2c_driver.h>
 #include <string.h>
 
 #include "stm32f4xx.h"
 #include "gpio_driver.h"
-#include "usart_driver.h"
 
 /*
- * USART GPIOs:
- * CK       =>  PA8
- * TX       =>  PA9
- * RX       =>  PA10
- * CTS      =>  PA11
- * RTS      =>  PA12
+ * I2C GPIOs:
+ * SDA      =>  PB7
+ * SCL      =>  PB8
 */
 
 #define LED_PIN             13
 #define BTN_PIN             0
 
-#define USART_CK            8
-#define USART_TX            9
-#define USART_RX            10
-#define USART_CTS           11
-#define USART_RTS           12
+#define I2C_SDA             7
+#define I2C_SCL             8
+
+#define SLAVE_ADDR          0x03
 
 volatile uint8_t button_trigger = 0;
-uint8_t buffer[30];
-uint8_t err;
-
-GPIO_Handle_t gpioHandle = {
-    .pGPIOx = GPIOC,
-    .GPIO_PinConfig = {
-        .GPIO_PinNumber = LED_PIN,
-        .GPIO_PinMode = GPIO_ModeOutput,
-        .GPIO_PinOPType = GPIO_OpTypePP,
-        .GPIO_PinPuPdControl = GPIO_NoPuPd,
-        .GPIO_PinSpeed = GPIO_SpeedHigh
-    }
-};
-
-USART_Handle_t usartHandle = {
-    .pUSARTx = USART1,
-    .USART_Config = {
-        .BaudRate = USART_BaudRate_9600,
-        .Oversampling = USART_OversamplingBy8,
-        .BitMethod = USART_ThreeSampleBitMethod,
-        .ParityControl = USART_ParityControlDisabled,
-        .ParitySelection = USART_EvenParity,
-        .StopBits = USART_StopBits1,
-        .WordLength = USART_WordLength8Bits,
-        .CTSControl = USART_CTSDisabled,
-        .RTSControl = USART_RTSDisabled,
-        .ClockConfig = {
-            // Optional clock provider
-            .ClockControl = USART_ClockDisabled,
-            // .CPHA = USART_PhaseFirstEdge,
-            // .CPOL = USART_PolarityLOW,
-            // .LastBitClockPulse = USART_LastBitLOW
-        }
-    }
-};
-
-int __io_putchar(int ch) {
-    USART_PeripheralTXControl(&usartHandle, ENABLE);
-    USART_SendData(&usartHandle, (uint8_t*)&ch, sizeof(ch));
-    USART_PeripheralTXControl(&usartHandle, DISABLE);
-    return ch;
-};
-
-// void SystemInit() {
-
-// }
 
 int main(void) {
+    GPIO_Handle_t gpioHandle = {
+        .pGPIOx = GPIOC,
+        .GPIO_PinConfig = {
+            .GPIO_PinNumber = LED_PIN,
+            .GPIO_PinMode = GPIO_ModeOutput,
+            .GPIO_PinOPType = GPIO_OpTypePP,
+            .GPIO_PinPuPdControl = GPIO_NoPuPd,
+            .GPIO_PinSpeed = GPIO_SpeedHigh
+        }
+    };
 
-    // HCLK - 32MHz; APB1 - 32 MHz; APB2 - 16 MHz
-
-    // CLOCK_SelectSysClock(CLOCK_SysClockHSI);
-    // CLOCK_Disable(CLOCK_SrcPLL);
-    // CLOCK_SetPLLFactors(8, 128, CLOCK_PLLSysClkPresc4);
-    // CLOCK_Enable(CLOCK_SrcPLL);
-    // CLOCK_SelectSysClock(CLOCK_SysClockPLL);
-    // CLOCK_SetAHBBusPrescaler(CLOCK_AHBPresc2);
-    // CLOCK_SetAPBBusPrescaler(CLOCK_BusAPB1, CLOCK_APBPresc1);
-    // CLOCK_SetAPBBusPrescaler(CLOCK_BusAPB2, CLOCK_APBPresc2);
+    I2C_Handle_t i2cHandle = {
+        .pI2Cx = I2C1,
+        .I2C_Config = {
+            .I2C_SCLSpeed = I2C_SclSpeedSM,
+            .I2C_DeviceAddressLen = I2C_DeviceAddr7Bits,
+            .I2C_DeviceAddress = 0x01,
+            .I2C_FMDutyCycle = I2C_FmDuty2
+        }
+    };
 
     // Init the LED
     GPIO_Init(&gpioHandle);
@@ -96,35 +70,53 @@ int main(void) {
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
-    // Init USART TX
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_TX;
-    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
+    // Init I2C SCL
+    gpioHandle.pGPIOx = GPIOB;
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SCL;
     gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAlternate;
-    gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF7;
-    GPIO_Init(&gpioHandle);
-    //
-    // // Init USART RX
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = USART_RX;
+    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
+    gpioHandle.GPIO_PinConfig.GPIO_PinOPType = GPIO_OpTypeOD;
+    gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF4;
     GPIO_Init(&gpioHandle);
 
-    USART_PeriClockControl(&usartHandle, ENABLE);
-    USART_Init(&usartHandle);
-    USART_PeripheralControl(&usartHandle, ENABLE);
+    // Init I2C SDA
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SDA;
+    GPIO_Init(&gpioHandle);
+
+    // Init I2C
+    I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
+    I2C_Init(&i2cHandle);
 
     while (1) {
         if (button_trigger) {
             // Small delay because of debouncing
             for (int i = 0; i < 1000000; i++);
-            GPIO_ToggleOutputPin(GPIOC, LED_PIN);
-            char *msg = "Hello, from STM32!\n";
 
-            printf(msg);
+            // uint8_t tx_data[16] = "Hello, World!";
+            uint8_t command = 0x51;
+            uint8_t length = 0;
 
+            I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
+
+            // Get the length
+            I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_StopDisabled);
+            I2C_MasterReceiveData(&i2cHandle, &length, sizeof(length), SLAVE_ADDR, I2C_StopDisabled);
+
+            // Receive the data
+            uint8_t rx_data[length];
+            if (length > 0) {
+                command = 0x52;
+                I2C_MasterSendData(&i2cHandle, &command, sizeof(command), SLAVE_ADDR, I2C_StopDisabled);
+                I2C_MasterReceiveData(&i2cHandle, rx_data, sizeof(rx_data), SLAVE_ADDR, I2C_StopEnabled);
+            }
+
+            if (rx_data[3] == 4) GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+
+            I2C_PeripheralControl(i2cHandle.pI2Cx, DISABLE);
             button_trigger = 0;
         }
     };
 }
-
 
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
