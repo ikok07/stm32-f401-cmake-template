@@ -58,6 +58,7 @@ set (PROJECT_SOURCES
 	drivers/src/usart_driver.c
 	drivers/src/clock_driver.c
 	drivers/src/flash_driver.c
+	drivers/src/timer_driver.c
 )
 
 set (PROJECT_DEFINES
