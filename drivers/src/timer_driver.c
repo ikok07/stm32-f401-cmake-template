@@ -340,6 +340,98 @@ void TIM_LockConfiguration(TIM_Handle_t *pTIMHandle, TIM_LockLevel_e LockLevel) 
     pTIMHandle->pTIMx->BDTR |= (LockLevel << TIM_BDTR_LOCK_Pos);
 }
 
+/**
+ * @brief Enables the desired timer interrupts
+ * @param pTIMHandle timer handle
+ * @param InterruptMask All interrupts which need to be enabled. Available options from @TimerInterrupts
+ */
+void TIM_EnableInterrupts(TIM_Handle_t *pTIMHandle, uint32_t InterruptMask) {
+    pTIMHandle->pTIMx->DIER |= InterruptMask;
+}
+
+/**
+ * @brief Disables the desired timer interrupts
+ * @param pTIMHandle timer handle
+ * @param InterruptMask All interrupts which need to be disabled. Available options from @TimerInterrupts
+ */
+void TIM_DisableInterrupts(TIM_Handle_t *pTIMHandle, uint32_t InterruptMask) {
+    pTIMHandle->pTIMx->DIER &=~ InterruptMask;
+}
+
+/**
+ * @brief Enables the IRQ lines for the general purpose timers
+ * @note You should use TIM_IRQTIM1Enable() when you use TIM1, not this one!
+ * @param pTIMHandle timer handle
+ * @param Priority The desired interrupt priority
+ */
+void TIM_IRQEnable(TIM_Handle_t *pTIMHandle, uint8_t Priority) {
+    if (pTIMHandle->pTIMx == TIM1) return;
+
+    uint8_t irqNumber = TIM2_IRQn;
+    if (pTIMHandle->pTIMx == TIM3) irqNumber = TIM3_IRQn;
+    if (pTIMHandle->pTIMx == TIM4) irqNumber = TIM4_IRQn;
+    if (pTIMHandle->pTIMx == TIM5) irqNumber = TIM5_IRQn;
+    if (pTIMHandle->pTIMx == TIM9) irqNumber = TIM1_BRK_TIM9_IRQn;
+    if (pTIMHandle->pTIMx == TIM10) irqNumber = TIM1_UP_TIM10_IRQn;
+    if (pTIMHandle->pTIMx == TIM11) irqNumber = TIM1_TRG_COM_TIM11_IRQn;
+
+    NVIC_EnableIRQ(irqNumber);
+    NVIC_SetPriority(irqNumber, Priority);
+}
+
+/**
+ * @brief Disables the IRQ lines for the general purpose timers
+ * @note You should use TIM_IRQTIM1Disable() when you use TIM1, not this one!
+ * @warning Some timers share the same IRQ line with the TIM1! You should disable those lines only if you are sure that this will not cause problems!
+ * @param pTIMHandle timer handle
+ */
+void TIM_IRQDisable(TIM_Handle_t *pTIMHandle) {
+    uint8_t irqNumber = TIM2_IRQn;
+    if (pTIMHandle->pTIMx == TIM3) irqNumber = TIM3_IRQn;
+    if (pTIMHandle->pTIMx == TIM4) irqNumber = TIM4_IRQn;
+    if (pTIMHandle->pTIMx == TIM5) irqNumber = TIM5_IRQn;
+    if (pTIMHandle->pTIMx == TIM9) irqNumber = TIM1_BRK_TIM9_IRQn;
+    if (pTIMHandle->pTIMx == TIM10) irqNumber = TIM1_UP_TIM10_IRQn;
+    if (pTIMHandle->pTIMx == TIM11) irqNumber = TIM1_TRG_COM_TIM11_IRQn;
+
+    NVIC_DisableIRQ(irqNumber);
+}
+
+/**
+ * @brief Enables the desired IRQ lines for TIM1
+ * @param IRQPairs Structure containing the IRQ number and the priority for the desired interrupt
+ * @param Len The length of the IRQPairs array
+ */
+void TIM_IRQTIM1Enable(TIM_AdvancedTimerIRQPair_t *IRQPairs, uint8_t Len) {
+    while (Len > 0) {
+        uint8_t number = IRQPairs[Len - 1].IRQNumber;
+        uint8_t priority = IRQPairs[Len - 1].Priority;
+        NVIC_EnableIRQ(number);
+        NVIC_SetPriority(number, priority);
+        Len--;
+    }
+}
+
+/**
+ * @brief Disables the desired IRQ lines for TIM1
+ * @param IRQNumbers The IRQ numbers which need to be disabled
+ * @param Len The length of the IRQNumbers array
+ */
+void TIM_IRQTIM1Disable(uint8_t *IRQNumbers, uint8_t Len) {
+    while (Len > 0) {
+        NVIC_DisableIRQ(IRQNumbers[Len - 1]);
+        Len--;
+    }
+}
+
+uint8_t TIM_GetStatusFlag(TIM_Handle_t *pTIMHandle, TIM_Flag_e Flag) {
+    return (pTIMHandle->pTIMx->SR & (1 << Flag)) > 0 ? 1 : 0;
+}
+
+void TIM_ClearStatusFlag(TIM_Handle_t *pTIMHandle, TIM_Flag_e Flag) {
+    pTIMHandle->pTIMx->SR &=~ (1 << Flag);
+}
+
 uint8_t calc_dtg_value(TIM_DeadTimeClkDivision_e clkDivision, uint32_t dead_time) {
     // Only TIM1 supports dead time
     uint32_t timerClk = CLOCK_GetApb2Hz();
@@ -363,11 +455,11 @@ uint8_t calc_dtg_value(TIM_DeadTimeClkDivision_e clkDivision, uint32_t dead_time
     if (counts < 128) {
         dtg = counts;
     } else if (counts < 255) {
-        dtg = 0x80 | (counts / 2) - 64;
+        dtg = 0x80 | ((counts / 2) - 64);
     } else if (counts < 505) {
-        dtg = 0xC0  | (counts / 8) - 32;
+        dtg = 0xC0  | ((counts / 8) - 32);
     } else if (counts < 1009) {
-        dtg = 0xE0 | (counts / 16) - 32;
+        dtg = 0xE0 | ((counts / 16) - 32);
     }
 
     return dtg;

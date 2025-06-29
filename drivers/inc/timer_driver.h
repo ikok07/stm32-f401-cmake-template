@@ -52,6 +52,19 @@
                                                     else if (chan == TIM_CaptureCompareChan4) CCER |= (polarity << TIM_CCER_CC4P_Pos);\
                                                 } while (0)
 
+/**
+ * @TimerInterrupts
+ */
+#define TIM_IT_UPDATE    (1 << TIM_DIER_UIE_Pos)
+#define TIM_IT_CC1       (1 << TIM_DIER_CC1IE_Pos)
+#define TIM_IT_CC2       (1 << TIM_DIER_CC2IE_Pos)
+#define TIM_IT_CC3       (1 << TIM_DIER_CC3IE_Pos)
+#define TIM_IT_CC4       (1 << TIM_DIER_CC4IE_Pos)
+#define TIM_IT_COM       (1 << TIM_DIER_COMIE_Pos)
+#define TIM_IT_TRIGGER   (1 << TIM_DIER_TIE_Pos)
+#define TIM_IT_BREAK     (1 << TIM_DIER_BIE_Pos)
+
+
 /* ------------ ERROR CODES ------------ */
 
 /* ------------ CONFIG STRUCTURES ------------ */
@@ -126,8 +139,8 @@ typedef enum {
 } TIM_OutputCompareMode_e;
 
 typedef enum {
-    TIM_OutputComparePreloadDisabled,
-    TIM_OutputComparePreloadEnabled
+    TIM_OutputComparePreloadDisabled,               // TIMx_CCR1 can be written at anytime, the new value is taken in account immediately.
+    TIM_OutputComparePreloadEnabled                 // Read/Write operations access the preload register. TIMx_CCR1 preload value is loaded in the active register at each update event.
 } TIM_OutputComparePreloadToggle_e;
 
 typedef enum {
@@ -154,6 +167,21 @@ typedef enum {
     TIM_LockLevel3,         // LOCK Level 2 + CC Control bits (OCxM and OCxPE bits in TIMx_CCMRx registers, as long as the related channel is configured in output through the CCxS bits) can no longer be written.
 } TIM_LockLevel_e;
 
+typedef enum {
+    TIM_FlagUpdate = TIM_SR_UIF_Pos,
+    TIM_FlagCC1 = TIM_SR_CC1IF_Pos,
+    TIM_FlagCC2 = TIM_SR_CC2IF_Pos,
+    TIM_FlagCC3 = TIM_SR_CC3IF_Pos,
+    TIM_FlagCC4 = TIM_SR_CC4IF_Pos,
+    TIM_FlagCOM = TIM_SR_COMIF_Pos,
+    TIM_FlagTrigger = TIM_SR_TIF_Pos,
+    TIM_FlagBreak = TIM_SR_BIF_Pos,
+    TIM_FlagCC1OF = TIM_SR_CC1OF_Pos,
+    TIM_FlagCC2OF = TIM_SR_CC2OF_Pos,
+    TIM_FlagCC3OF = TIM_SR_CC3OF_Pos,
+    TIM_FlagCC4OF = TIM_SR_CC4OF_Pos,
+} TIM_Flag_e;
+
 typedef struct {
     TIM_ARRPreload_e PreloadEnabled;
     TIM_Direction_e Direction;
@@ -172,6 +200,11 @@ typedef struct {
     TIM_DeadTimeClkDivision_e ClockDivision;
     uint8_t Duration;
 } TIM_DeadTimeGeneratorConfig_t;
+
+typedef struct {
+    uint8_t IRQNumber;
+    uint8_t Priority;
+} TIM_AdvancedTimerIRQPair_t;
 
 typedef struct {
     TIM_TypeDef *pTIMx;
@@ -236,5 +269,21 @@ void TIM_OffStateForRunModeControl(TIM_Handle_t *pTIMHandle, TIM_OffStateMode_e 
 void TIM_OffStateForIdleModeControl(TIM_Handle_t *pTIMHandle, TIM_OffStateMode_e Mode);
 void TIM_ConfigureDeadTimeGenerator(TIM_Handle_t *pTIMHandle, TIM_DeadTimeGeneratorConfig_t Config);
 void TIM_LockConfiguration(TIM_Handle_t *pTIMHandle, TIM_LockLevel_e LockLevel);
+
+/*
+ * Interrupts
+ */
+void TIM_EnableInterrupts(TIM_Handle_t *pTIMHandle, uint32_t InterruptMask);
+void TIM_DisableInterrupts(TIM_Handle_t *pTIMHandle, uint32_t InterruptMask);
+void TIM_IRQEnable(TIM_Handle_t *pTIMHandle, uint8_t Priority);
+void TIM_IRQDisable(TIM_Handle_t *pTIMHandle);
+void TIM_IRQTIM1Enable(TIM_AdvancedTimerIRQPair_t *IRQPairs, uint8_t Len);
+void TIM_IRQTIM1Disable(uint8_t *IRQNumbers, uint8_t Len);
+
+/*
+ * Status flags
+ */
+uint8_t TIM_GetStatusFlag(TIM_Handle_t *pTIMHandle, TIM_Flag_e Flag);
+void TIM_ClearStatusFlag(TIM_Handle_t *pTIMHandle, TIM_Flag_e Flag);
 
 #endif //TIMER_DRIVER_H

@@ -170,6 +170,19 @@ void CLOCK_SetSecuritySystem(uint8_t Enabled) {
     }
 }
 
+/**
+* @brief Selects how the clock frequency of all the timers connected to APB1
+         and APB2 domain is prescaled.
+ * @param Option Prescaler option
+ */
+void CLOCK_SetTimersClockPrescalers(CLOCK_TimClkPrescOption_e Option) {
+    if (Option == CLOCK_TimClkPrescOption1) {
+        RCC->DCKCFGR &=~ (1 << RCC_DCKCFGR_TIMPRE_Pos);
+    } else {
+        RCC->DCKCFGR |= (1 << RCC_DCKCFGR_TIMPRE_Pos);
+    }
+}
+
 
 
 

@@ -104,6 +104,11 @@ typedef enum {
     CLOCK_AHBPresc512       = 0b1111,
 } CLOCK_AHBPrescaler_e;
 
+typedef enum {
+    CLOCK_TimClkPrescOption1,           // If the APB prescaler is configured to a division factor of 1, TIMxCLK = HCKL . Otherwise, the timer clock frequencies are set to twice to the frequency of the APB domain to which the timers are connected: TIMxCLK = 2xPCLKx.
+    CLOCK_TimClkPrescOption2,           // If the APB prescaler is configured to a division factor of 1 or 2, TIMxCLK = HCKL. Otherwise, the timer clock frequencies are set to four times to the frequency of the APB domain to which the timers are connected: TIMxCLK = 4xPCLKx.
+} CLOCK_TimClkPrescOption_e;
+
 /* ------------ METHODS ------------ */
 
 /*
@@ -140,5 +145,6 @@ CLOCK_Error_e CLOCK_SetPLLFactors(uint32_t InDivFactor, uint32_t MultFactor, CLO
  * Other methods
  */
 void CLOCK_SetSecuritySystem(uint8_t Enabled);
+void CLOCK_SetTimersClockPrescalers(CLOCK_TimClkPrescOption_e Option);
 
 #endif //CLOCK_DRIVER_H
