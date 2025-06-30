@@ -51,6 +51,7 @@ set (PROJECT_SOURCES
 	src/main.c
 	src/syscalls.c
 	src/sysmem.c
+	utils/src/generic_methods.c
 	drivers/src/gpio_driver.c
 	drivers/src/spi_driver.c
 	drivers/src/i2c_driver.c
@@ -59,6 +60,7 @@ set (PROJECT_SOURCES
 	drivers/src/clock_driver.c
 	drivers/src/flash_driver.c
 	drivers/src/timer_driver.c
+	drivers/src/systick_driver.c
 )
 
 set (PROJECT_DEFINES
@@ -70,6 +72,7 @@ set (PROJECT_INCLUDES
 	# LIST INCLUDE DIRECTORIES HERE
     include
 	drivers/inc
+	utils/inc
 	chip_headers/CMSIS/Include
 	chip_headers/CMSIS/Device/ST/STM32F4xx/Include
 )
