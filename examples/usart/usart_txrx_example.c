@@ -8,6 +8,7 @@
 #include "stm32f4xx.h"
 #include "gpio_driver.h"
 #include "usart_driver.h"
+#include "generic_methods.h"
 
 /*
  * USART GPIOs:
@@ -116,6 +117,9 @@ int main(void) {
     // TX interrupts will be enabled when calling the send method
     USART_Interrupt_e interrupts[1] = {USART_InterruptIdleLine};
     USART_IRQEnable(&usartHandle, interrupts, sizeof(interrupts));
+
+    // Start the systick
+    Generic_InitSysTick();
 
     while (1) {
         if (button_trigger) {

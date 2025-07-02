@@ -52,6 +52,7 @@
 
 typedef enum {
     BME280_ErrOK,
+    BME280_ErrTimeout,
     BME280_ErrConnFail,
     BME280_WriteErr,
     BME280_ReadErr,

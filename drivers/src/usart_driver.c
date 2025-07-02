@@ -8,6 +8,7 @@
 #include <commons.h>
 #include <math.h>
 #include <stddef.h>
+#include <systick_driver.h>
 
 static USART_BaudRateResult_t calc_baud_rate(USART_Handle_t *pUSARTHandle, USART_BaudRate_e BaudRate);
 
@@ -161,7 +162,7 @@ void USART_DeInit(USART_Handle_t *pUSARTHandle) {
 USART_Error_e USART_SendData(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, uint32_t Len) {
     while (Len > 0) {
         // Wait for empty tx buffer
-        while (!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TXE_Pos))) {}
+        WAIT_WITH_TIMEOUT(!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TXE_Pos)), USART_ErrTimeout, TIMEOUT_MS);
 
         if (pUSARTHandle->USART_Config.WordLength == USART_WordLength9Bits) {
             if (pUSARTHandle->USART_Config.ParityControl == USART_ParityControlEnabled) {
@@ -184,7 +185,7 @@ USART_Error_e USART_SendData(USART_Handle_t *pUSARTHandle, uint8_t *pTXBuffer, u
     }
 
     // Wait for transfer complete
-    while (!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TC_Pos)));
+    WAIT_WITH_TIMEOUT(!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_TC_Pos)), USART_ErrTimeout, TIMEOUT_MS);
 
     return USART_ErrOK;
 }
@@ -210,7 +211,7 @@ USART_Error_e USART_ReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRXBuffer
     uint32_t originalLen = Len;
     while (Len > 0) {
         // Wait for data reception
-        while (!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_RXNE_Pos)));
+        WAIT_WITH_TIMEOUT(!(pUSARTHandle->pUSARTx->SR & (1 << USART_SR_RXNE_Pos)), USART_ErrTimeout, TIMEOUT_MS);
 
         if (pUSARTHandle->USART_Config.WordLength == USART_WordLength9Bits) {
             if (pUSARTHandle->USART_Config.ParityControl == USART_ParityControlEnabled) {

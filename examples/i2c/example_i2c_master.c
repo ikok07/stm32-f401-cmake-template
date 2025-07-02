@@ -2,6 +2,7 @@
 // Created by Kok on 6/18/25.
 //
 
+#include <generic_methods.h>
 #include <i2c_driver.h>
 #include <stdio.h>
 #include <string.h>
@@ -74,6 +75,9 @@ int main(void) {
     // Init I2C
     I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
     I2C_Init(&i2cHandle);
+
+    // Start the systick
+    Generic_InitSysTick();
 
     while (1) {
         if (button_trigger) {

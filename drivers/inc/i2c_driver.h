@@ -35,10 +35,13 @@
  */
 #define I2C_MAX_TRISE_NS_FOR_SPEED(speed)                  (speed <= I2C_SclSpeedSM ? 1000 : 300)
 
+#define TIMEOUT_MS              3000
+
 /* ------------ ERROR CODES ------------ */
 
 typedef enum {
     I2C_ErrOK,
+    I2C_ErrTimeout,
     I2C_ErrResetEnabled,
     I2C_ErrLenZero,
     I2C_ErrPerNotReady

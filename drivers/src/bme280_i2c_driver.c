@@ -216,6 +216,7 @@ BME280_Error_t write_to_register(BME280_Handle_t *pBME280Handle, BME280_RegValue
         I2C_StopEnabled
     );
     if (err != I2C_ErrOK) {
+        if (err == I2C_ErrTimeout) return BME280_ErrTimeout;
         return BME280_WriteErr;
     }
 
@@ -232,6 +233,7 @@ BME280_Error_t read_from_register(BME280_Handle_t *pBME280Handle, uint8_t Regist
         I2C_StopDisabled
     );
     if (err != I2C_ErrOK) {
+        if (err == I2C_ErrTimeout) return BME280_ErrTimeout;
         return BME280_WriteErr;
     }
 
@@ -243,6 +245,7 @@ BME280_Error_t read_from_register(BME280_Handle_t *pBME280Handle, uint8_t Regist
         I2C_StopEnabled
     );
     if (err != I2C_ErrOK) {
+        if (err == I2C_ErrTimeout) return BME280_ErrTimeout;
         return BME280_ReadErr;
     }
 

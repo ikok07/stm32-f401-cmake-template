@@ -6,6 +6,7 @@
 
 #include <clock_driver.h>
 #include <commons.h>
+#include <systick_driver.h>
 
 static void gen_start_condition(I2C_TypeDef *pI2Cx);
 void clear_addr_flag(I2C_Handle_t *pI2CHandle);
@@ -14,9 +15,9 @@ static void exec_addr_phase(I2C_Handle_t *pI2CHandle, uint8_t Address, uint8_t W
 static void exec_first_10bit_addr_phase(I2C_Handle_t *pI2CHandle, uint16_t Address, uint8_t Write);
 static void exec_second_10bit_addr_phase(I2C_Handle_t *pI2CHandle, uint16_t Address);
 
-static void read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop);
-static void read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop);
-static void read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, I2C_DisableStop_e DisableStop);
+static I2C_Error_e read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop);
+static I2C_Error_e read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop);
+static I2C_Error_e read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, I2C_DisableStop_e DisableStop);
 
 // Interrupt handlers
 static void it_start_handler(I2C_Handle_t *pI2CHandle);
@@ -125,7 +126,7 @@ I2C_Error_e I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uin
     gen_start_condition(pI2CHandle->pI2Cx);
 
     // Confirm START condition
-    while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_SB_Pos));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_SB_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
     // Send slave address
     if (pI2CHandle->I2C_Config.I2C_DeviceAddressLen == I2C_DeviceAddr7Bits) {
@@ -137,7 +138,7 @@ I2C_Error_e I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uin
     }
 
     // Confirm slave device available on the bus
-    while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_ADDR_Pos));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_ADDR_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
     // Clear ADDR flag
     clear_addr_flag(pI2CHandle);
@@ -145,15 +146,15 @@ I2C_Error_e I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTXBuffer, uin
     // Send the data
     while (Len > 0) {
         // Wait for data register to be empty
-        while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_TXE_Pos));
+        WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_TXE_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
         pI2CHandle->pI2Cx->DR = *pTXBuffer++;
         Len--;
     }
 
     // Wait for transmission completion
-    while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_TXE_Pos));
-    while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_BTF_Pos));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_TXE_Pos), I2C_ErrTimeout, TIMEOUT_MS);
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_BTF_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
     if (!DisableStop) {
         // Generate STOP condition
@@ -182,7 +183,7 @@ I2C_Error_e I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, 
     gen_start_condition(pI2CHandle->pI2Cx);
 
     // Confirm START condition
-    while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_SB_Pos));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_SB_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
     // Send slave address
     if (pI2CHandle->I2C_Config.I2C_DeviceAddressLen == I2C_DeviceAddr7Bits) {
@@ -190,32 +191,34 @@ I2C_Error_e I2C_MasterReceiveData(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, 
     } else {
         // Send header with WRITE command
         exec_first_10bit_addr_phase(pI2CHandle, SlaveAddr, ENABLE);
-        while (!(pI2CHandle->pI2Cx->SR1 & (1 << I2C_SR1_ADD10_Pos)));
+        WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & (1 << I2C_SR1_ADD10_Pos)), I2C_ErrTimeout, TIMEOUT_MS);
         exec_second_10bit_addr_phase(pI2CHandle, SlaveAddr);
 
         // Confirm slave device available on the bus
-        while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_ADDR_Pos));
+        WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_ADDR_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
         // Clear address flag
         clear_addr_flag(pI2CHandle);
 
         // Generate repeated start condition
         gen_start_condition(pI2CHandle->pI2Cx);
-        while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_SB_Pos));
+        WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_SB_Pos), I2C_ErrTimeout, TIMEOUT_MS);
+
         // Send header with READ command
         exec_first_10bit_addr_phase(pI2CHandle, SlaveAddr, DISABLE);
     }
 
     // Confirm slave device available on the bus
-    while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_ADDR_Pos));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_ADDR_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
     // Read the data depending on the length
+    I2C_Error_e err;
     if (Len == 1) {
-        read_single_byte(pI2CHandle, pRXBuffer, DisableStop);
+        if ((err = read_single_byte(pI2CHandle, pRXBuffer, DisableStop)) != I2C_ErrOK) return err;
     } else if (Len == 2) {
-        read_two_bytes(pI2CHandle, pRXBuffer, DisableStop);
+        if ((err = read_two_bytes(pI2CHandle, pRXBuffer, DisableStop)) != I2C_ErrOK) return err;
     } else {
-        read_multiple_bytes(pI2CHandle, pRXBuffer, Len, DisableStop);
+        if ((err = read_multiple_bytes(pI2CHandle, pRXBuffer, Len, DisableStop)) != I2C_ErrOK) return err;
     }
 
     // Re-enable ACK
@@ -496,7 +499,7 @@ void I2C_AcknowledgeControl(I2C_TypeDef *pI2Cx, uint8_t Enabled) {
 
 /* ------------ Master read data ------------ */
 
-void read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop) {
+I2C_Error_e read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop) {
 
     // Disable ACK
     I2C_AcknowledgeControl(pI2CHandle->pI2Cx, DISABLE);
@@ -505,7 +508,7 @@ void read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableS
     clear_addr_flag(pI2CHandle);
 
     // Wait until data available
-    while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_RXNE_Pos));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_RXNE_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
     if (!DisableStop) {
         // Generate STOP condition
@@ -513,9 +516,11 @@ void read_single_byte(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableS
     }
 
     *pRXBuffer = pI2CHandle->pI2Cx->DR;
+
+    return I2C_ErrOK;
 }
 
-void read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop) {
+I2C_Error_e read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableStop_e DisableStop) {
     // Disable ACK and set POS
     I2C_AcknowledgeControl(pI2CHandle->pI2Cx, DISABLE);
     pI2CHandle->pI2Cx->CR1 |= (1 << I2C_CR1_POS_Pos);
@@ -523,7 +528,7 @@ void read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableSto
     // Clear ADDR flag
     clear_addr_flag(pI2CHandle);
 
-    while (!(pI2CHandle->pI2Cx->SR1 & (1 << I2C_SR1_BTF_Pos)));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & (1 << I2C_SR1_BTF_Pos)), I2C_ErrTimeout, TIMEOUT_MS);
 
     if (!DisableStop) {
         // Generate STOP condition
@@ -532,26 +537,28 @@ void read_two_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, I2C_DisableSto
 
     pRXBuffer[0] = pI2CHandle->pI2Cx->DR;
     pRXBuffer[1] = pI2CHandle->pI2Cx->DR;
+
+    return I2C_ErrOK;
 }
 
-void read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, I2C_DisableStop_e DisableStop) {
+I2C_Error_e read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t Len, I2C_DisableStop_e DisableStop) {
     // Clear ADDR flag
     clear_addr_flag(pI2CHandle);
 
     // Read data until 2 bytes are left
     for (int i = Len; i > 2; i--) {
         // Wait for data register to have data
-        while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_RXNE_Pos));
+        WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_RXNE_Pos), I2C_ErrTimeout, TIMEOUT_MS);
         pRXBuffer[Len - i] = pI2CHandle->pI2Cx->DR;
     }
 
-    while (!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_RXNE_Pos));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & 1 << I2C_SR1_RXNE_Pos), I2C_ErrTimeout, TIMEOUT_MS);
 
     // 2 bytes left
     // Disable ACK
     I2C_AcknowledgeControl(pI2CHandle->pI2Cx, DISABLE);
 
-    while (!(pI2CHandle->pI2Cx->SR1 & (1 << I2C_SR1_BTF_Pos)));
+    WAIT_WITH_TIMEOUT(!(pI2CHandle->pI2Cx->SR1 & (1 << I2C_SR1_BTF_Pos)), I2C_ErrTimeout, TIMEOUT_MS);
 
     if (!DisableStop) {
         // Generate STOP condition
@@ -561,6 +568,8 @@ void read_multiple_bytes(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer, uint8_t L
     // Read last 2 bytes
     pRXBuffer[Len - 2] = pI2CHandle->pI2Cx->DR;
     pRXBuffer[Len - 1] = pI2CHandle->pI2Cx->DR;
+
+    return I2C_ErrOK;
 }
 
 /* ------------ Interrupt Handlers ------------ */

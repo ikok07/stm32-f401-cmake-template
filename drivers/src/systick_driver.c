@@ -9,6 +9,8 @@
 #include "stm32f4xx.h"
 #include "core_cm4.h"
 
+volatile uint32_t tick_count = 0;
+
 SYSTICK_Error_e SYSTICK_Init(SYSTICK_Config_t Config) {
     // Reload value
     uint32_t clk = Config.ClockSource == SYSTICK_SrcAHB ? CLOCK_GetHclkHz() : CLOCK_GetHclkHz() / 8;
@@ -25,7 +27,24 @@ SYSTICK_Error_e SYSTICK_Init(SYSTICK_Config_t Config) {
     // Interrupt state
     SysTick->CTRL |= (Config.InterruptsStatus << SysTick_CTRL_TICKINT_Pos);
 
+    if (Config.TickCounterEnabled) SYSTICK_StartTickCounter();
+
     return SYSTICK_ErrOK;
+}
+
+
+void SYSTICK_StartTickCounter() {
+    SYSTICK_CounterControl(ENABLE);
+}
+
+SYSTICK_Error_e SYSTICK_GetCurrTicks(uint32_t *ticks) {
+    if (!SYSTICK_CheckCounterEnabled()) return SYSTICK_ErrCounterDisabled;
+    *ticks = tick_count;
+    return SYSTICK_ErrOK;;
+}
+
+void SYSTICK_ClearTickCounter() {
+    tick_count = 0;
 }
 
 /**
@@ -38,6 +57,10 @@ void SYSTICK_CounterControl(uint8_t Enabled) {
     } else {
         SysTick->CTRL &=~ (1 << SysTick_CTRL_ENABLE_Pos);
     }
+}
+
+uint8_t SYSTICK_CheckCounterEnabled() {
+    return SysTick->CTRL & (1 << SysTick_CTRL_ENABLE_Pos);
 }
 
 /**
@@ -85,4 +108,11 @@ uint32_t SYSTICK_GetCounterValue() {
 SYSTICK_Error_e SYSTICK_ConfigureForMs(uint32_t MS) {
     uint32_t clk = ((SysTick->CTRL >> SysTick_CTRL_CLKSOURCE_Pos) & 0x01) == SYSTICK_SrcAHB ? CLOCK_GetHclkHz() : CLOCK_GetHclkHz() / 8;
     return SYSTICK_SetReloadValue((clk / 1000) * MS - 1);
+}
+
+/**
+ * Interrupt handler
+ */
+void SysTick_Handler() {
+    tick_count++;
 }

@@ -11,7 +11,8 @@
 
 typedef enum {
     SYSTICK_ErrOK,
-    SYSTICK_ErrInvalidReloadValue
+    SYSTICK_ErrInvalidReloadValue,
+    SYSTICK_ErrCounterDisabled
 } SYSTICK_Error_e;
 
 /* ------------ CONFIG STRUCTURES ------------ */
@@ -30,6 +31,7 @@ typedef struct {
     SYSTICK_Src_e ClockSource;
     SYSTICK_InterruptsStatus_e InterruptsStatus;
     uint32_t TimerPeriodMS;
+    uint8_t TickCounterEnabled;
 } SYSTICK_Config_t;
 
 /* ------------ METHODS ------------ */
@@ -40,9 +42,17 @@ typedef struct {
 SYSTICK_Error_e SYSTICK_Init(SYSTICK_Config_t Config);
 
 /*
+ * Ticks controls
+ */
+void SYSTICK_StartTickCounter();
+SYSTICK_Error_e SYSTICK_GetCurrTicks();
+void SYSTICK_ClearTickCounter();
+
+/*
  * Counter
  */
 void SYSTICK_CounterControl(uint8_t Enabled);
+uint8_t SYSTICK_CheckCounterEnabled();
 uint8_t SYSTICK_CheckCountFlag();
 
 /*

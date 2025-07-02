@@ -6,8 +6,9 @@
 #define GENERIC_METHODS_H
 
 #include <stdint.h>
+#include "systick_driver.h"
 
-void Generic_InitTimer();
-void Generic_Delay(uint32_t ms);
+void Generic_InitSysTick();
+SYSTICK_Error_e Generic_Delay(uint32_t ms);
 
 #endif //GENERIC_METHODS_H

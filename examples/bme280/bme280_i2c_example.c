@@ -3,6 +3,7 @@
 //
 
 #include <bme280_i2c_driver.h>
+#include <generic_methods.h>
 #include <i2c_driver.h>
 #include <string.h>
 
@@ -93,6 +94,9 @@ int main(void) {
     I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
     I2C_Init(&i2cHandle);
     I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
+
+    // Start the systick
+    Generic_InitSysTick();
 
     // Configure BME280
     BME280_Configure(&bme280Handle);

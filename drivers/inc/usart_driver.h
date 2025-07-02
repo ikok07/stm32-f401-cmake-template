@@ -7,12 +7,15 @@
 
 #include "stm32f4xx.h"
 
+#define TIMEOUT_MS                  3000
+
 #define USART_INDEX_TO_IRQ_NUMBER(perIndex)             perIndex == 1 ? USART1_IRQn : perIndex == 2 ? USART2_IRQn : perIndex == 6 ? USART6_IRQn : USART1_IRQn
 
 /* ------------ ERROR CODES ------------ */
 
 typedef enum {
     USART_ErrOK,
+    USART_ErrTimeout,
     USART_ErrArgumentNULL,
     USART_ErrInvalidBaudRate,
     USART_PerBusy,
