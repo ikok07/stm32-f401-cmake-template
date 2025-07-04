@@ -11,7 +11,7 @@
 /* ------------ COMMUNICATION MACROS ------------ */
 
 #define SSD1306_I2C_ADDR                                     0x3C       // or 0x3D
-#define SSD1306_I2C_BUFFER_MAX_LEN                           512
+#define SSD1306_I2C_SEND_BUFFER_LEN                          1025
 
 #define SSD1306_COMM_CONT_BIT_POS                            7
 #define SSD1306_COMM_DC_BIT_POS                              6
@@ -24,6 +24,14 @@
 #define SCROLL_DIR_VRIGHT                                    1
 #define SCROLL_DIR_VLEFT                                     2
 
+#define SSD1306_FONT_WIDTH                                   6
+#define SSD1306_FONT_HEIGHT                                  8
+
+#define SSD1306_MIN_WIDTH                                    0
+#define SSD1306_MAX_WIDTH                                    127
+#define SSD1306_MIN_HEIGHT                                   0
+#define SSD1306_MAX_HEIGHT                                   64
+
 #define SSD1306_MIN_CONTRAST                                 0
 #define SSD1306_MAX_CONTRAST                                 255
 
@@ -34,6 +42,9 @@
 #define SSD1306_MAX_PAGE_LWR_COL_ADDR                        0xF     // Page mode
 #define SSD1306_MIN_PAGE_HIGH_COL_ADDR                       0x10    // Page mode
 #define SSD1306_MAX_PAGE_HIGH_COL_ADDR                       0x1F    // Page mode
+
+#define SSD1306_MIN_PAGE_ADDR                                0x00    // Horizontal and Vertical mode
+#define SSD1306_MAX_PAGE_ADDR                                0x07    // Horizontal and Vertical mode
 #define SSD1306_MIN_COL_ADDR                                 0x00    // Horizontal and Vertical mode
 #define SSD1306_MAX_COL_ADDR                                 0x7F    // Horizontal and Vertical mode (127d)
 
@@ -104,7 +115,9 @@ typedef enum {
     SSD1306_ErrComm,
     SSD1306_ErrNotInitialized,
     SSD1306_ErrInvalidArg,
-    SSD1306_ErrBufferOverflow
+    SSD1306_ErrBufferOverflow,
+    SSD1306_ErrInvalidAddrMode,
+    SSD1306_ErrOutOfBounds
 } SSD1306_Error_e;
 
 typedef enum {
@@ -215,7 +228,22 @@ typedef struct {
     SSD1306_State_t DeviceState;
 } SSD1306_Handle_t;
 
-/* ------------ METHODS ------------ */
+/* ------------ DATA DISPLAY METHODS ------------ */
+
+// Page addressing mode
+SSD1306_Error_e SSD1306_SetCursor(SSD1306_Handle_t *pSSD1306Handle, uint8_t Column, SSD1306_Page_e Page);
+SSD1306_Error_e SSD1306_Write(SSD1306_Handle_t *pSSD1306Handle, char *str);
+SSD1306_Error_e SSD1306_Clear(SSD1306_Handle_t *pSSD1306Handle);
+
+// Horizontal / Vertical addressing mode
+SSD1306_Error_e SSD1306_SetWriteAreaHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t xStart, uint8_t xEnd, uint8_t yStart, uint8_t yEnd);
+SSD1306_Error_e SSD1306_WriteHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, char *str);
+SSD1306_Error_e SSD1306_DrawHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint8_t *bitmap, uint8_t len);
+SSD1306_Error_e SSD1306_ClearAreaHV(SSD1306_Handle_t *pSSD1306Handle);
+SSD1306_Error_e SSD1306_UpdateHV(SSD1306_Handle_t *pSSD1306Handle);
+
+
+/* ------------ COMMAND METHODS ------------ */
 
 /*
  * Init
