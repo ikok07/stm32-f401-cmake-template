@@ -63,6 +63,7 @@ set (PROJECT_SOURCES
 	drivers/src/systick_driver.c
 	drivers/src/ssd1306_i2c_driver.c
 	drivers/src/adc_driver.c
+	drivers/src/dma_driver.c
 )
 
 set (PROJECT_DEFINES
