@@ -5,9 +5,9 @@
 #include "dma_driver.h"
 #include "commons.h"
 
-uint8_t check_interrupt_enabled(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Interrupt);
-uint8_t get_interrupt_flag(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Interrupt);
-void clear_interrupt_flag(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Interrupt);
+static uint8_t check_interrupt_enabled(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Interrupt);
+static uint8_t get_interrupt_flag(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Interrupt);
+static void clear_interrupt_flag(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Interrupt);
 
 /**
  * @brief Enables or disables the desired DMA stream
@@ -110,7 +110,16 @@ DMA_Error_e DMA_ConfigureSingleBufferTransfer(DMA_Handle_t *pDMAHandle, uint32_t
     pDMAHandle->pDMAxStream->M0AR = Mem0Addr;
 
     // Data length
-    pDMAHandle->pDMAxStream->NDTR = Len;
+    if (pDMAHandle->Config.MemoryBurstConfig != DMA_Burst1) {
+        uint8_t multipleOfValue = DMA_MBURST_CONFIG_VAL_TO_BEATS(pDMAHandle->Config.MemoryBurstConfig) * (pDMAHandle->Config.MemoryDataSize / pDMAHandle->Config.PeripheralDataSize);
+        if (Len % multipleOfValue == 0) {
+            pDMAHandle->pDMAxStream->NDTR = Len;
+        } else {
+            return DMA_ErrInvalidDataLength;
+        }
+    } else {
+        pDMAHandle->pDMAxStream->NDTR = Len;
+    }
 
     return DMA_ErrOK;
 }
@@ -135,7 +144,16 @@ DMA_Error_e DMA_ConfigureDoubleBufferTransfer(DMA_Handle_t *pDMAHandle, uint32_t
     pDMAHandle->pDMAxStream->M1AR = Mem1Addr;
 
     // Data length
-    pDMAHandle->pDMAxStream->NDTR = Len;
+    if (pDMAHandle->Config.MemoryBurstConfig != DMA_Burst1) {
+        uint8_t multipleOfValue = DMA_MBURST_CONFIG_VAL_TO_BEATS(pDMAHandle->Config.MemoryBurstConfig) * (pDMAHandle->Config.MemoryDataSize / pDMAHandle->Config.PeripheralDataSize);
+        if (Len % multipleOfValue == 0) {
+            pDMAHandle->pDMAxStream->NDTR = Len;
+        } else {
+            return DMA_ErrInvalidDataLength;
+        }
+    } else {
+        pDMAHandle->pDMAxStream->NDTR = Len;
+    }
 
     return DMA_ErrOK;
 }
@@ -147,6 +165,14 @@ DMA_Error_e DMA_ConfigureDoubleBufferTransfer(DMA_Handle_t *pDMAHandle, uint32_t
 void DMA_StartTransaction(DMA_Handle_t *pDMAHandle) {
     DMA_ClearInterruptFlags(pDMAHandle);
     DMA_PeripheralControl(pDMAHandle, ENABLE);
+}
+
+/**
+ * @brief Stops the currently active DMA transaction
+ * @param pDMAHandle DMA handle
+ */
+void DMA_StopTransaction(DMA_Handle_t *pDMAHandle) {
+    pDMAHandle->pDMAxStream->CR &=~ (1 << DMA_SxCR_EN_Pos);
 }
 
 /**
@@ -257,6 +283,33 @@ void DMA_IRQHanding(DMA_Handle_t *pDMAHandle) {
         clear_interrupt_flag(pDMAHandle, DMA_InterruptTransferComplete);
         DMA_ApplicationCallback(pDMAHandle, DMA_FlagTransferComplete);
     }
+}
+
+/**
+ * @param pDMAHandle DMA Handle
+ * @return The remaining transfers that need to be made by the DMA stream
+ */
+uint16_t DMA_GetRemainingTransferCount(DMA_Handle_t *pDMAHandle) {
+    return pDMAHandle->pDMAxStream->NDTR & 0xFFFF;
+}
+
+/**
+ * @param pDMAHandle DMA handle
+ * @return If the DMA stream is currently transferring data
+ */
+uint8_t DMA_IsTransferActive(DMA_Handle_t *pDMAHandle) {
+    return pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_EN_Pos) > 0;
+}
+
+/**
+ * @param pDMAHandle DMA handle
+ * @return Pointer to the currently active DMA buffer
+ */
+uint32_t *DMA_GetCurrentBuffer(DMA_Handle_t *pDMAHandle) {
+    if (!(pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_DBM_Pos))) return (uint32_t*)pDMAHandle->pDMAxStream->M0AR;
+
+    if (pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_CT_Pos)) return (uint32_t*)pDMAHandle->pDMAxStream->M1AR;
+    return (uint32_t*)pDMAHandle->pDMAxStream->M0AR;
 }
 
 /**

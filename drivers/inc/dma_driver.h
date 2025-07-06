@@ -24,13 +24,18 @@
                                                     stream == DMA2_Stream6 ? DMA2_Stream6_IRQn : \
                                                     stream == DMA2_Stream7 ? DMA2_Stream7_IRQn : 0; \
 
+#define DMA_MBURST_CONFIG_VAL_TO_BEATS(configVal)           configVal == DMA_Burst1 ? 1 : \
+                                                            configVal == DMA_Burst4 ? 4 : \
+                                                            configVal == DMA_Burst8 ? 8 : \
+                                                            configVal == DMA_Burst16 ? 16 : 1
+
 /* ------------ ERROR CODES ------------ */
 
 typedef enum {
     DMA_ErrOK,
     DMA_ErrPerDisabled,
     DMA_ErrIncompatibleBufferMode,
-
+    DMA_ErrInvalidDataLength
 } DMA_Error_e;
 
 /* ------------ CONFIG STRUCTURES ------------ */
@@ -144,12 +149,20 @@ void DMA_Init(DMA_Handle_t *pDMAHandle);
 void DMA_DeInit(DMA_Handle_t *pDMAHandle);
 
 /*
+ * Status information
+ */
+uint16_t DMA_GetRemainingTransferCount(DMA_Handle_t *pDMAHandle);
+uint8_t DMA_IsTransferActive(DMA_Handle_t *pDMAHandle);
+uint32_t *DMA_GetCurrentBuffer(DMA_Handle_t *pDMAHandle);
+
+/*
  * Transfers
  */
 DMA_Error_e DMA_ConfigureSingleBufferTransfer(DMA_Handle_t *pDMAHandle, uint32_t PerAddr, uint32_t Mem0Addr, uint16_t Len);
 DMA_Error_e DMA_ConfigureDoubleBufferTransfer(DMA_Handle_t *pDMAHandle, uint32_t PerAddr, uint32_t Mem0Addr, uint32_t Mem1Addr, uint16_t Len);
 
 void DMA_StartTransaction(DMA_Handle_t *pDMAHandle);
+void DMA_StopTransaction(DMA_Handle_t *pDMAHandle);
 
 /*
  * Interrupts

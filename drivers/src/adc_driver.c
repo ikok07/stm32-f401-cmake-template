@@ -10,6 +10,8 @@
 #include <systick_driver.h>
 
 static ADC_Error_e check_single_channel_only(ADC_Handle_t *pADCHandle);
+static uint8_t check_interrupt_enabled(ADC_Interrupt_e Interrupt);
+static uint8_t get_interrupt_flag(ADC_Interrupt_e Interrupt);
 
 /**
  * @brief Controls the peripheral's clock
@@ -325,14 +327,14 @@ void ADC_IRQDisable() {
 }
 
 void ADC_IRQHandling(ADC_Handle_t *pADCHandle) {
-    if (ADC1->SR & (1 << ADC_SR_EOC_Pos)) {
+    if (check_interrupt_enabled(ADC_InterruptEOC) && get_interrupt_flag(ADC_InterruptEOC)) {
         // Regular conversion complete
         *pADCHandle->ITState.pBuffer = ADC1->DR;
         pADCHandle->ITState.Status = ADC_ITReady;
         ADC_ApplicationCallback(pADCHandle, ADC_FlagEndOfRegularConversion);
     }
 
-    if (ADC1->SR & (1 << ADC_SR_JEOC_Pos)) {
+    if (check_interrupt_enabled(ADC_InterruptJEOC) && get_interrupt_flag(ADC_InterruptJEOC)) {
         // Injected conversion complete
         ADC1->SR &=~ (1 << ADC_SR_JEOC_Pos);
 
@@ -342,13 +344,13 @@ void ADC_IRQHandling(ADC_Handle_t *pADCHandle) {
         ADC_ApplicationCallback(pADCHandle, ADC_FlagEndOfInjectedConversion);
     }
 
-    if (ADC1->SR & (1 << ADC_SR_AWD_Pos)) {
+    if (check_interrupt_enabled(ADC_InterruptAWD) && get_interrupt_flag(ADC_InterruptAWD)) {
         // Watchdog triggered
         ADC1->SR &=~ (1 << ADC_SR_AWD_Pos);
         ADC_ApplicationCallback(pADCHandle, ADC_FlagAnalogWatchdog);
     }
 
-    if (ADC1->SR & (1 << ADC_SR_OVR_Pos)) {
+    if (check_interrupt_enabled(ADC_InterruptOVR) && get_interrupt_flag(ADC_InterruptOVR)) {
         // Overrun
         ADC1->SR &=~ (1 << ADC_SR_OVR_Pos);
         ADC_ApplicationCallback(pADCHandle, ADC_FlagOverrun);
@@ -369,4 +371,32 @@ ADC_Error_e check_single_channel_only(ADC_Handle_t *pADCHandle) {
     }
 
     return ADC_ErrOK;
+}
+
+uint8_t check_interrupt_enabled(ADC_Interrupt_e Interrupt) {
+    switch (Interrupt) {
+        case ADC_InterruptEOC:
+            return ADC1->CR1 & (1 << ADC_CR1_EOCIE_Pos) > 0;
+        case ADC_InterruptJEOC:
+            return ADC1->CR1 & (1 << ADC_CR1_JEOCIE_Pos) > 0;
+        case ADC_InterruptAWD:
+            return ADC1->CR1 & (1 << ADC_CR1_AWDIE_Pos) > 0;
+        case ADC_InterruptOVR:
+            return ADC1->CR1 & (1 << ADC_CR1_OVRIE_Pos) > 0;
+        default: return 0;
+    }
+}
+
+uint8_t get_interrupt_flag(ADC_Interrupt_e Interrupt) {
+    switch (Interrupt) {
+        case ADC_InterruptEOC:
+            return ADC1->SR & (1 << ADC_SR_EOC_Pos) > 0;
+        case ADC_InterruptJEOC:
+            return ADC1->SR & (1 << ADC_SR_JEOC_Pos) > 0;
+        case ADC_InterruptAWD:
+            return ADC1->SR & (1 << ADC_SR_AWD_Pos) > 0;
+        case ADC_InterruptOVR:
+            return ADC1->SR & (1 << ADC_SR_OVR_Pos) > 0;
+        default: return 0;
+    }
 }
