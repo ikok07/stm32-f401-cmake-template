@@ -140,6 +140,7 @@ typedef struct {
 /*
  * Peripheral control
  */
+void DMA_PeriClockControl(DMA_Handle_t *pDMAHandle, uint8_t Enable);
 void DMA_PeripheralControl(DMA_Handle_t *pDMAHandle, uint8_t Enable);
 
 /*

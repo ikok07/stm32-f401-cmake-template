@@ -10,6 +10,27 @@ static uint8_t get_interrupt_flag(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Inte
 static void clear_interrupt_flag(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Interrupt);
 
 /**
+ * @brief Enables or disables the access to the AHB1 bus for the corresponding DMA
+ * @param pDMAHandle DMA handle
+ * @param Enable If the peripheral clock should be enabled
+ */
+void DMA_PeriClockControl(DMA_Handle_t *pDMAHandle, uint8_t Enable) {
+    if (Enable) {
+        if (pDMAHandle->pDMAxStream < DMA2_Stream0) {
+            RCC->AHB1ENR |= (1 << RCC_AHB1ENR_DMA1EN_Pos);
+        } else {
+            RCC->AHB1ENR |= (1 << RCC_AHB1ENR_DMA2EN_Pos);
+        }
+    } else {
+        if (pDMAHandle->pDMAxStream < DMA2_Stream0) {
+            RCC->AHB1ENR &=~ (1 << RCC_AHB1ENR_DMA1EN_Pos);
+        } else {
+            RCC->AHB1ENR &=~ (1 << RCC_AHB1ENR_DMA2EN_Pos);
+        }
+    }
+}
+
+/**
  * @brief Enables or disables the desired DMA stream
  * @param pDMAHandle DMA handle
  * @param Enable If the DMA stream should be enabled
@@ -91,6 +112,7 @@ void DMA_DeInit(DMA_Handle_t *pDMAHandle) {
     pDMAHandle->pDMAxStream->M0AR = 0;
     pDMAHandle->pDMAxStream->M1AR = 0;
     pDMAHandle->pDMAxStream->FCR = 0x21;
+    DMA_PeriClockControl(pDMAHandle, DISABLE);
 }
 
 /**
@@ -298,7 +320,7 @@ uint16_t DMA_GetRemainingTransferCount(DMA_Handle_t *pDMAHandle) {
  * @return If the DMA stream is currently transferring data
  */
 uint8_t DMA_IsTransferActive(DMA_Handle_t *pDMAHandle) {
-    return pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_EN_Pos) > 0;
+    return (pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_EN_Pos)) > 0;
 }
 
 /**
@@ -360,15 +382,15 @@ __weak void DMA_ApplicationCallback(DMA_Handle_t *pDMAHandle, DMA_Flag_e Flag) {
 uint8_t check_interrupt_enabled(DMA_Handle_t *pDMAHandle, DMA_Interrupt_e Interrupt) {
     switch (Interrupt) {
         case DMA_InterruptHalfTransfer:
-            return pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_HTIE_Pos) > 0;
+            return (pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_HTIE_Pos)) > 0;
         case DMA_InterruptTransferComplete:
-            return pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_TCIE_Pos) > 0;
+            return (pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_TCIE_Pos)) > 0;
         case DMA_InterruptTransferError:
-            return pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_TEIE_Pos) > 0;
+            return (pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_TEIE_Pos)) > 0;
         case DMA_InterruptDirectModeError:
-            return pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_DMEIE_Pos) > 0;
+            return (pDMAHandle->pDMAxStream->CR & (1 << DMA_SxCR_DMEIE_Pos)) > 0;
         case DMA_InterruptFIFOOverrun:
-            return pDMAHandle->pDMAxStream->FCR & (1 << DMA_SxFCR_FEIE_Pos) > 0;
+            return (pDMAHandle->pDMAxStream->FCR & (1 << DMA_SxFCR_FEIE_Pos)) > 0;
         default: return 0;
     }
 }

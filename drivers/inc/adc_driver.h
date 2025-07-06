@@ -5,6 +5,7 @@
 #ifndef ADC_DRIVER_H
 #define ADC_DRIVER_H
 
+#include <dma_driver.h>
 #include <stdint.h>
 
 /* ------------ MACROS ------------ */
@@ -33,7 +34,8 @@ typedef enum {
     ADC_ErrInvalidChannel,
     ADC_ErrMethodNotForCorrectChannelLength,
     ADC_ErrContModeNotAllowed,
-    ADC_ErrNoChannelInSequence
+    ADC_ErrNoChannelInSequence,
+    ADC_ErrDMAFailed
 } ADC_Error_e;
 
 /* ------------ CONFIG STRUCTURES ------------ */
@@ -188,12 +190,6 @@ typedef enum {
 } ADC_Flag_e;
 
 typedef enum {
-    ADC_MultiRegularChannelMode,
-    ADC_MultiInjectedChannelMode,
-    ADC_MultiRegularInjectedChannelMode,
-} ADC_MultiChannelReadMode_e;
-
-typedef enum {
     ADC_ITReady,
     ADC_ITBusy,
 } ADC_ITStatus;
@@ -237,6 +233,7 @@ typedef struct {
     ADC_Channel_e SampledInjectedChannelsSequence[ADC_INJECTED_CHAN_SEQUENCE_LEN];          // Array of the desired injected channel sequence
     uint8_t SampledRegularChannelsSequenceLength;
     uint8_t SampledInjectedChannelsSequenceLength;
+    uint8_t DMAInterruptPriority;
 } ADC_Config_t;
 
 typedef struct {
@@ -245,6 +242,7 @@ typedef struct {
 } ADC_ITState;
 
 typedef struct {
+    DMA_Handle_t DMAHandle;
     ADC_DMADataStatus DataStatus;
 } ADC_DMAState;
 
@@ -275,8 +273,8 @@ ADC_Error_e ADC_ReadSingleChannel(ADC_Handle_t *pADCHandle, ADC_Channel_e Channe
 ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, ADC_Channel_e Channel, uint16_t *pBuffer);
 
 // DMA only
-void ADC_StartMultiChannelRead(ADC_Handle_t *pADCHandle, ADC_MultiChannelReadMode_e Mode);
-ADC_Error_e ADC_ReadMultipleChannels(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
+ADC_Error_e ADC_StartRegularMultiChannelRead(ADC_Handle_t *pADCHandle);
+ADC_Error_e ADC_ReadMultipleRegularChannels(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
 
 /*
  * IRQ Handling

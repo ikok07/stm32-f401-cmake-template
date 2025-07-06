@@ -9,9 +9,13 @@
 #include <commons.h>
 #include <systick_driver.h>
 
+static uint16_t samplesBuffer[19];
+
 static ADC_Error_e check_single_channel_only(ADC_Handle_t *pADCHandle);
 static uint8_t check_interrupt_enabled(ADC_Interrupt_e Interrupt);
 static uint8_t get_interrupt_flag(ADC_Interrupt_e Interrupt);
+
+static ADC_Error_e enable_adc_dma(ADC_Handle_t *pADCHandle);
 
 /**
  * @brief Controls the peripheral's clock
@@ -183,6 +187,10 @@ ADC_Error_e ADC_Init(ADC_Handle_t *pADCHandle) {
     // Injected channel sequence length
     ADC1->JSQR |= ((pADCHandle->Config.SampledInjectedChannelsSequenceLength - 1) << ADC_JSQR_JL_Pos);
 
+    // Setup DMA (if multiple channels setup)
+    uint8_t totalConfiguredChannels = pADCHandle->Config.SampledInjectedChannelsSequenceLength + pADCHandle->Config.SampledRegularChannelsSequenceLength;
+    if (totalConfiguredChannels > 1) return enable_adc_dma(pADCHandle);
+
     return ADC_ErrOK;
 }
 
@@ -248,6 +256,15 @@ ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, ADC_Channel_e Chan
     // Start conversion
     if (regularChanLen > 0) ADC1->CR2 |= (1 << ADC_CR2_SWSTART_Pos);
     else if (injectedChanLen > 0) ADC1->CR2 |= (1 << ADC_CR2_JSWSTART_Pos);
+
+    return ADC_ErrOK;
+}
+
+ADC_Error_e ADC_StartRegularMultiChannelRead(ADC_Handle_t *pADCHandle) {
+    if (pADCHandle->ITState.Status != ADC_ITReady) return ADC_ErrBusy;
+
+    DMA_StartTransaction(&pADCHandle->DMAState.DMAHandle);
+    ADC1->CR2 |= (1 << ADC_CR2_SWSTART_Pos);
 
     return ADC_ErrOK;
 }
@@ -376,13 +393,13 @@ ADC_Error_e check_single_channel_only(ADC_Handle_t *pADCHandle) {
 uint8_t check_interrupt_enabled(ADC_Interrupt_e Interrupt) {
     switch (Interrupt) {
         case ADC_InterruptEOC:
-            return ADC1->CR1 & (1 << ADC_CR1_EOCIE_Pos) > 0;
+            return (ADC1->CR1 & (1 << ADC_CR1_EOCIE_Pos)) > 0;
         case ADC_InterruptJEOC:
-            return ADC1->CR1 & (1 << ADC_CR1_JEOCIE_Pos) > 0;
+            return (ADC1->CR1 & (1 << ADC_CR1_JEOCIE_Pos)) > 0;
         case ADC_InterruptAWD:
-            return ADC1->CR1 & (1 << ADC_CR1_AWDIE_Pos) > 0;
+            return (ADC1->CR1 & (1 << ADC_CR1_AWDIE_Pos)) > 0;
         case ADC_InterruptOVR:
-            return ADC1->CR1 & (1 << ADC_CR1_OVRIE_Pos) > 0;
+            return (ADC1->CR1 & (1 << ADC_CR1_OVRIE_Pos)) > 0;
         default: return 0;
     }
 }
@@ -390,13 +407,62 @@ uint8_t check_interrupt_enabled(ADC_Interrupt_e Interrupt) {
 uint8_t get_interrupt_flag(ADC_Interrupt_e Interrupt) {
     switch (Interrupt) {
         case ADC_InterruptEOC:
-            return ADC1->SR & (1 << ADC_SR_EOC_Pos) > 0;
+            return (ADC1->SR & (1 << ADC_SR_EOC_Pos)) > 0;
         case ADC_InterruptJEOC:
-            return ADC1->SR & (1 << ADC_SR_JEOC_Pos) > 0;
+            return (ADC1->SR & (1 << ADC_SR_JEOC_Pos)) > 0;
         case ADC_InterruptAWD:
-            return ADC1->SR & (1 << ADC_SR_AWD_Pos) > 0;
+            return (ADC1->SR & (1 << ADC_SR_AWD_Pos)) > 0;
         case ADC_InterruptOVR:
-            return ADC1->SR & (1 << ADC_SR_OVR_Pos) > 0;
+            return (ADC1->SR & (1 << ADC_SR_OVR_Pos)) > 0;
         default: return 0;
     }
+}
+
+ADC_Error_e enable_adc_dma(ADC_Handle_t *pADCHandle) {
+    ADC1->CR2 |= (1 << ADC_CR2_DMA_Pos);
+
+    // Generate DMA requests as long as data is converted
+    ADC1->CR2 |= (1 << ADC_CR2_DDS_Pos);
+
+    DMA_Config_t dmaConfig = {
+        .Channel = DMA_Channel0,
+        .Direction = DMA_DirPerToMem,
+        .Priority = DMA_PriorityMedium,
+        .CircularMode = pADCHandle->Config.ContinuousModeEnabled,
+        .FlowController = DMA_FlowController,
+        .DirectModeDisabled = DISABLE,
+        .DoubleBufferMode = DISABLE,
+        .MemoryBurstConfig = DMA_Burst1,
+        .MemoryDataSize = DMA_DataSizeHalfWord,
+        .PeripheralDataSize = DMA_DataSizeHalfWord,
+        .MemoryIncrementMode = ENABLE,
+        .PeripheralIncrementMode = DISABLE,
+        .PeripheralBurstConfig = DMA_Burst1,
+        .PeripheralIncrementOffsetSize = DMA_PINCOSPSIZE,
+    };
+
+
+    pADCHandle->DMAState.DMAHandle.pDMAxStream = DMA2_Stream4;
+    pADCHandle->DMAState.DMAHandle.Config = dmaConfig;
+
+    DMA_PeriClockControl(&pADCHandle->DMAState.DMAHandle, ENABLE);
+    DMA_Init(&pADCHandle->DMAState.DMAHandle);
+
+    DMA_Interrupt_e interrupts[] = {
+        DMA_InterruptHalfTransfer,
+        DMA_InterruptTransferComplete,
+        DMA_InterruptTransferError,
+        DMA_InterruptDirectModeError,
+        DMA_InterruptFIFOOverrun,
+    };
+
+    DMA_EnableInterrupts(&pADCHandle->DMAState.DMAHandle, interrupts, 5);
+    DMA_IRQEnable(&pADCHandle->DMAState.DMAHandle, pADCHandle->Config.DMAInterruptPriority);
+
+    uint8_t totalConfiguredChannels = pADCHandle->Config.SampledInjectedChannelsSequenceLength + pADCHandle->Config.SampledRegularChannelsSequenceLength;
+    DMA_Error_e err = DMA_ErrOK;
+    (void)err;
+    if ((err = DMA_ConfigureSingleBufferTransfer(&pADCHandle->DMAState.DMAHandle, (uint32_t)&ADC1->DR, (uint32_t)&samplesBuffer, totalConfiguredChannels)) != DMA_ErrOK) return ADC_ErrDMAFailed;
+
+    return ADC_ErrOK;
 }

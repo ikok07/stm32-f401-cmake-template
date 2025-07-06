@@ -1,3 +1,7 @@
+//
+// Created by Kok on 7/6/25.
+//
+
 
 #include <generic_methods.h>
 #include <string.h>
@@ -6,13 +10,12 @@
 #include "adc_driver.h"
 
 /*
- * ADC GPIOs: PA3 (ADC1_IN3), PA4 (ADC1_IN4)
+ * ADC GPIO: PA4 (ADC1_IN4)
 */
 
 #define LED_PIN             13
 #define BTN_PIN             0
-#define ADC1_PIN            3
-#define ADC2_PIN            4
+#define ADC_PIN             4
 
 volatile uint8_t button_trigger = 0;
 
@@ -42,10 +45,9 @@ ADC_Handle_t adcHandle = {
             .WatchdogHigherThreshold = 3000,
             .WatchdogLowerThreshold = 1000
         },
-        .SampledRegularChannelsSequence = {ADC_Channel3, ADC_Channel4},
-        .SampledRegularChannelsSequenceLength = 2,
-        .SampledInjectedChannelsSequenceLength = 0,
-        .DMAInterruptPriority = 1,
+        .SampledRegularChannelsSequence = {ADC_Channel4},
+        .SampledRegularChannelsSequenceLength = 1,
+        .SampledInjectedChannelsSequenceLength = 0
     }
 };
 
@@ -61,18 +63,25 @@ int main(void) {
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
-    // Init ADC GPIOs
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = ADC1_PIN;
+    // Init ADC GPIO
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = ADC_PIN;
     gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl =  GPIO_NoPuPd;
     gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAnalog;
     GPIO_Init(&gpioHandle);
 
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = ADC2_PIN;
-    GPIO_Init(&gpioHandle);
-
     // Init ADC
     ADC_PeriClockControl(ENABLE);
-    ADC_Error_e err = ADC_Init(&adcHandle);
+    ADC_Init(&adcHandle);
+
+    ADC_Interrupt_e adcInterrupts[4] = {
+        ADC_InterruptEOC,
+        ADC_InterruptJEOC,
+        ADC_InterruptAWD,
+        ADC_InterruptOVR
+    };
+    ADC_EnableInterrupts(&adcHandle, adcInterrupts, 4);
+    ADC_IRQEnable(1);
+
     ADC_PeripheralControl(ENABLE);
 
     Generic_InitSysTick();
@@ -84,7 +93,8 @@ int main(void) {
 
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
 
-            err = ADC_StartRegularMultiChannelRead(&adcHandle);
+            uint16_t buffer = 0;
+            ADC_Error_e err = ADC_ReadSingleChannelIT(&adcHandle, ADC_Channel4, &buffer);
             (void)err;
             button_trigger = 0;
         }
@@ -94,4 +104,20 @@ int main(void) {
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
     button_trigger = 1;
+}
+
+void ADC_IRQHandler() {
+    ADC_IRQHandling(&adcHandle);
+}
+
+void ADC_ApplicationCallback(ADC_Handle_t *pADCHandle, ADC_Flag_e Flag) {
+    uint16_t value;
+    if (Flag == ADC_FlagEndOfRegularConversion) {
+        value = *pADCHandle->ITState.pBuffer;
+    } else if (Flag == ADC_FlagEndOfInjectedConversion) {
+        value = *pADCHandle->ITState.pBuffer;
+    } else if (Flag == ADC_FlagAnalogWatchdog) {
+        GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+    }
+    (void)value;
 }
