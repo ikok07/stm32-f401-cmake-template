@@ -10,8 +10,8 @@
 static uint8_t sendBuffer[SSD1306_I2C_SEND_BUFFER_LEN];
 static uint8_t frameBuffer[SSD1306_I2C_SEND_BUFFER_LEN - 1];            // Omitting the control byte
 
-static SSD1306_Error_e send_commands(SSD1306_Handle_t *pSSD1306Handle, uint8_t *commands, uint8_t len);
-static SSD1306_Error_e send_data(SSD1306_Handle_t *pSSD1306Handle, uint8_t *data, uint8_t len);
+static SSD1306_Error_e send_commands(SSD1306_Handle_t *pSSD1306Handle, uint8_t *commands, uint32_t len);
+static SSD1306_Error_e send_data(SSD1306_Handle_t *pSSD1306Handle, uint8_t *data, uint32_t len);
 static void h_addr_set_pixel(uint8_t x, uint8_t y, uint8_t on);
 static void v_addr_set_pixel(uint8_t x, uint8_t y, uint8_t on);
 static uint8_t *get_char_bitmap(char c);
@@ -22,7 +22,7 @@ static void reset_state(SSD1306_Handle_t *pSSD1306Handle);
                                                             err = send_commands(handle, cmds, sizeof(cmds));        \
                                                         } while (0)
 
-static const uint8_t font6x8[96][6] = {
+static uint8_t font6x8[96][6] = {
     {0x00,0x00,0x00,0x00,0x00,0x00}, // ' '
     {0x00,0x00,0x5F,0x00,0x00,0x00}, // '!'
     {0x00,0x07,0x00,0x07,0x00,0x00}, // '"'
@@ -313,7 +313,8 @@ SSD1306_Error_e SSD1306_UpdateHV(SSD1306_Handle_t *pSSD1306Handle) {
 
 /**
  * @brief Initializes the device I2C communication
- * @note Before calling this method the required GPIOS MUST be configured
+ * @note Before calling this method the required GPIOS \b MUST be configured.\n\n
+ * @note Also the i2c handle inside the config structure \b SHOULD include pointer to the i2c peripheral
  * @param pSSD1306Handle Device handle
  */
 SSD1306_Error_e SSD1306_Init(SSD1306_Handle_t *pSSD1306Handle) {
@@ -781,7 +782,7 @@ SSD1306_Error_e SSD1306_SetVCOMHDeselectLevel(SSD1306_Handle_t *pSSD1306Handle, 
     return err;
 }
 
-SSD1306_Error_e send_commands(SSD1306_Handle_t *pSSD1306Handle, uint8_t *commands, uint8_t len) {
+SSD1306_Error_e send_commands(SSD1306_Handle_t *pSSD1306Handle, uint8_t *commands, uint32_t len) {
     if (!pSSD1306Handle->DeviceInitialized) return SSD1306_ErrNotInitialized;
     if (len + 1 > SSD1306_I2C_SEND_BUFFER_LEN) return SSD1306_ErrBufferOverflow;
     if (len == 0) return SSD1306_ErrOK;
@@ -800,7 +801,7 @@ SSD1306_Error_e send_commands(SSD1306_Handle_t *pSSD1306Handle, uint8_t *command
     return err == I2C_ErrOK ? SSD1306_ErrOK : SSD1306_ErrComm;
 }
 
-SSD1306_Error_e send_data(SSD1306_Handle_t *pSSD1306Handle, uint8_t *data, uint8_t len) {
+SSD1306_Error_e send_data(SSD1306_Handle_t *pSSD1306Handle, uint8_t *data, uint32_t len) {
     if (!pSSD1306Handle->DeviceInitialized) return SSD1306_ErrNotInitialized;
     if (len + 1 > SSD1306_I2C_SEND_BUFFER_LEN) return SSD1306_ErrBufferOverflow;
     I2C_Error_e err = I2C_ErrOK;

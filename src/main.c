@@ -1,6 +1,8 @@
 
 #include <generic_methods.h>
 #include <i2c_driver.h>
+#include <ssd1306_i2c_driver.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "stm32f4xx.h"
@@ -18,10 +20,8 @@
 #define I2C_SDA             7
 #define I2C_SCL             8
 
-#define CURR_ADDR           0x01
-
 volatile uint8_t button_trigger = 0;
-uint8_t err;
+uint8_t counter = 0;
 
 GPIO_Handle_t gpioHandle = {
     .pGPIOx = GPIOC,
@@ -35,19 +35,22 @@ GPIO_Handle_t gpioHandle = {
 };
 
 I2C_Handle_t i2cHandle = {
-    .pI2Cx = I2C1,
-    .I2C_Config = {
-        .I2C_SCLSpeed = I2C_SclSpeedFM4K,
-        .I2C_DeviceAddressLen = I2C_DeviceAddr7Bits,
-        .I2C_DeviceAddress = CURR_ADDR,
-        .I2C_FMDutyCycle = I2C_FmDuty2
+    .pI2Cx = I2C1
+};
+
+SSD1306_Handle_t display = {
+    .Config = {
+        .I2CHandle = &i2cHandle
     }
 };
 
-void SystemInit() {
-    // Enable FPU
-    SCB->CPACR |= 0xF << 20;
-}
+const uint8_t tempImg[] = {
+    0xff, 0xff, 0xff, 0xff, 0xc3, 0xff, 0xff, 0x81, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff,
+    0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99,
+    0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x18, 0xff, 0xff, 0x3c, 0xff,
+    0xfe, 0x7e, 0x7f, 0xfe, 0x7e, 0x7f, 0xfe, 0x7e, 0x7f, 0xfe, 0x7e, 0x7f, 0xff, 0x3c, 0xff, 0xff,
+    0x00, 0xff, 0xff, 0xc3, 0xff, 0xff, 0xff, 0xff
+};
 
 int main(void) {
     // Init the LED
@@ -74,10 +77,11 @@ int main(void) {
     gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SDA;
     GPIO_Init(&gpioHandle);
 
-    // Init I2C
-    I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
-    I2C_Init(&i2cHandle);
-    I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
+    // Setup the display
+    SSD1306_Init(&display);
+    SSD1306_SetMemoryAddrMode(&display, SSD1306_MemAddrPage);
+    SSD1306_SetCursor(&display, 0, SSD1306_Page0);
+    SSD1306_DisplayControl(&display, ENABLE);
 
     while (1) {
         if (button_trigger) {
@@ -85,8 +89,16 @@ int main(void) {
             for (int i = 0; i < 1000000; i++);
 
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+            SSD1306_Clear(&display);
+            SSD1306_SetCursor(&display, counter, SSD1306_Page0);
+            SSD1306_Write(&display, "Hello, World ");
+
+            char buffer[16];
+            sprintf(buffer, "%d", counter);
+            SSD1306_Write(&display, buffer);
 
             button_trigger = 0;
+            counter++;
         }
     };
 }

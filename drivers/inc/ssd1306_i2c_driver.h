@@ -8,6 +8,11 @@
 #include <i2c_driver.h>
 #include <stdint.h>
 
+/*
+ * Helpful resource for generating bitmaps from images
+ * https://javl.github.io/image2cpp/
+ */
+
 /* ------------ COMMUNICATION MACROS ------------ */
 
 #define SSD1306_I2C_ADDR                                     0x3C       // or 0x3D
