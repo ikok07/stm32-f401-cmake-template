@@ -9,15 +9,31 @@
 
 /* ------------ MACROS ------------ */
 
-#define ADC_TOTAL_CHAN_COUNT                19
+#define ADC_TIMEOUT_MS                      3000
 
-#define WATCHDOG_MIN_THRES                  0x00
-#define WATCHDOG_MAX_THRES                  0xFFF
+#define ADC_TOTAL_CHAN_COUNT                19
+#define ADC_INJECTED_CHAN_COUNT             4
+
+#define ADC_REGULAR_CHAN_SEQUENCE_LEN       16
+#define ADC_INJECTED_CHAN_SEQUENCE_LEN      4
+
+#define ADC_WATCHDOG_MIN_THRES                  0x00
+#define ADC_WATCHDOG_MAX_THRES                  0xFFF
+
 
 /* ------------ ERROR CODES ------------ */
 
 typedef enum {
-    ADC_ErrOK
+    ADC_ErrOK,
+    ADC_ErrBusy,
+    ADC_ErrTimeout,
+    ADC_ErrPerNotEnabled,
+    ADC_ErrWatchdogThresInvalid,
+    ADC_ErrInvalidSequenceLength,
+    ADC_ErrInvalidChannel,
+    ADC_ErrMethodNotForCorrectChannelLength,
+    ADC_ErrContModeNotAllowed,
+    ADC_ErrNoChannelInSequence
 } ADC_Error_e;
 
 /* ------------ CONFIG STRUCTURES ------------ */
@@ -63,7 +79,10 @@ typedef enum {
 } ADC_DiscModeChanCount_e;
 
 typedef enum {
+    ADC_WatchdogDisabled,
     ADC_WatchdogSingleChannel,
+    ADC_WatchdogSingleRegularChannel,
+    ADC_WatchdogSingleInjectedChannel,
     ADC_WatchdogAllRegularChannels,
     ADC_WatchdogAllInjectedChannels,
     ADC_WatchdogAllChannels,
@@ -179,6 +198,11 @@ typedef enum {
     ADC_ITBusy,
 } ADC_ITStatus;
 
+typedef enum {
+    ADC_DMADataReady,
+    ADC_DMADataMissing,
+} ADC_DMADataStatus;
+
 typedef struct {
     ADC_WatchdogMode_e WatchdogMode;
     ADC_WatchdogChan_e WatchdogChannel;         // If watchdog mode is for single channel
@@ -187,8 +211,7 @@ typedef struct {
 } ADC_WatchdogConfig_t;
 
 typedef struct {
-    ADC_Channel_e Channel;
-    ADC_SamplingTime_e SamplingTime;
+
 } ADC_SamplingOption_t;
 
 typedef struct {
@@ -198,28 +221,31 @@ typedef struct {
     uint8_t DiscModeRegularChannels;
     uint8_t AutoInjectedGroupConversion;
     uint8_t ScanModeEnabled;
-    uint8_t DiscMode;
     ADC_WatchdogConfig_t WatchdogConfig;
     ADC_ExternalTrigger_e RegularExternalTrigger;
     ADC_ExternalTrigger_e InjectedExternalTrigger;
     ADC_RegularExternalEvent_e RegularExternalEvent;
     ADC_InjectedExternalEvent_e InjectedExternalEvent;
     ADC_DataAlign_e DataAlignment;
-    ADC_SamplingOption_t SamplingOptions[ADC_TOTAL_CHAN_COUNT];
+    ADC_SamplingTime_e SamplingTimes[ADC_TOTAL_CHAN_COUNT];
     ADC_Prescaler_e Prescaler;
-    uint16_t InjectedChanOffsets[4];
-    ADC_Channel_e SampledRegularChannelsSequence[16];
-    ADC_Channel_e SampledInjectedChannelsSequence[4];
+    uint8_t ContinuousModeEnabled;
     uint8_t VBATEnabled;
     uint8_t TEMPEnabled;
+    uint16_t InjectedChanOffsets[ADC_INJECTED_CHAN_COUNT];
+    ADC_Channel_e SampledRegularChannelsSequence[ADC_REGULAR_CHAN_SEQUENCE_LEN];            // Array of the desired regular channel sequence
+    ADC_Channel_e SampledInjectedChannelsSequence[ADC_INJECTED_CHAN_SEQUENCE_LEN];          // Array of the desired injected channel sequence
+    uint8_t SampledRegularChannelsSequenceLength;
+    uint8_t SampledInjectedChannelsSequenceLength;
 } ADC_Config_t;
 
 typedef struct {
     ADC_ITStatus Status;
+    uint16_t *pBuffer;
 } ADC_ITState;
 
 typedef struct {
-    uint8_t DataAvailable;
+    ADC_DMADataStatus DataStatus;
 } ADC_DMAState;
 
 typedef struct {
@@ -241,24 +267,27 @@ void ADC_PeripheralControl(uint8_t Enabled);
  */
 ADC_Error_e ADC_Init(ADC_Handle_t *pADCHandle);
 void ADC_DeInit(ADC_Handle_t *pADCHandle);
-void ADC_StartMultiChannelRead(ADC_Handle_t *pADCHandle, ADC_MultiChannelReadMode_e Mode);
 
 /*
  * Data sampling
  */
 ADC_Error_e ADC_ReadSingleChannel(ADC_Handle_t *pADCHandle, ADC_Channel_e Channel, uint16_t *pBuffer);
-ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, ADC_Channel_e Channel);
+ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, ADC_Channel_e Channel, uint16_t *pBuffer);
 
 // DMA only
+void ADC_StartMultiChannelRead(ADC_Handle_t *pADCHandle, ADC_MultiChannelReadMode_e Mode);
 ADC_Error_e ADC_ReadMultipleChannels(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
 
 /*
  * IRQ Handling
  */
-void ADC_IRQEnable(ADC_Interrupt_e *EnabledInterrupts, uint8_t Len);
-void ADC_IRQDisable(ADC_Interrupt_e *DisabledInterrupts, uint8_t Len);
-void ADC_IRQDisableAll();
-void ADC_IRQHandler(ADC_Handle_t *pADCHandle);
+ADC_Error_e ADC_EnableInterrupts(ADC_Handle_t *pADCHandle, ADC_Interrupt_e *EnabledInterrupts, uint8_t Len);
+void ADC_DisableInterrupts(ADC_Interrupt_e *DisabledInterrupts, uint8_t Len);
+void ADC_DisableAllInterrupts();
+
+void ADC_IRQEnable(uint8_t IRQPriority);
+void ADC_IRQDisable();
+void ADC_IRQHandling(ADC_Handle_t *pADCHandle);
 
 /*
  * Application callback

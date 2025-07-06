@@ -3,3 +3,370 @@
 //
 
 #include "adc_driver.h"
+
+#include "stm32f4xx.h"
+
+#include <commons.h>
+#include <systick_driver.h>
+
+static ADC_Error_e check_single_channel_only(ADC_Handle_t *pADCHandle);
+
+/**
+ * @brief Controls the peripheral's clock
+ * @param Enabled If the peripheral's clock should be enabled
+ */
+void ADC_PeriClockControl(uint8_t Enabled) {
+    if (Enabled) {
+        RCC->APB2ENR |= (1 << RCC_APB2ENR_ADC1EN_Pos);
+    } else {
+        RCC->APB2ENR &=~ (1 << RCC_APB2ENR_ADC1EN_Pos);
+    }
+}
+
+/**
+ * @brief Enables or disables the ADC peripheral
+ * @param Enabled If the peripheral should be enabled
+ */
+void ADC_PeripheralControl(uint8_t Enabled) {
+    if (Enabled) {
+        ADC1->CR2 |= (1 << ADC_CR2_ADON_Pos);
+    } else {
+        ADC1->CR2 &=~ (1 << ADC_CR2_ADON_Pos);
+    }
+}
+
+/**
+ * @brief Initializes the ADC peripheral
+ * @param pADCHandle ADC handle
+ */
+ADC_Error_e ADC_Init(ADC_Handle_t *pADCHandle) {
+    if (pADCHandle->Config.WatchdogConfig.WatchdogHigherThreshold > ADC_WATCHDOG_MAX_THRES || pADCHandle->Config.WatchdogConfig.WatchdogLowerThreshold < ADC_WATCHDOG_MIN_THRES) {
+        return ADC_ErrWatchdogThresInvalid;
+    }
+
+    if (
+        pADCHandle->Config.SampledRegularChannelsSequenceLength < 0 ||
+        pADCHandle->Config.SampledRegularChannelsSequenceLength > ADC_REGULAR_CHAN_SEQUENCE_LEN ||
+        pADCHandle->Config.SampledInjectedChannelsSequenceLength < 0 ||
+        pADCHandle->Config.SampledInjectedChannelsSequenceLength > ADC_INJECTED_CHAN_SEQUENCE_LEN
+    ) {
+        return ADC_ErrInvalidSequenceLength;
+    }
+
+    // Resolution
+    ADC1->CR1 |= (pADCHandle->Config.Resolution << ADC_CR1_RES_Pos);
+
+    // Discontinuous channel count
+    ADC1->CR1 |= (pADCHandle->Config.DiscontinuousChannelCount << ADC_CR1_DISCNUM_Pos);
+
+    // Discontinuous mode (Regular)
+    ADC1->CR1 |= (pADCHandle->Config.DiscModeRegularChannels << ADC_CR1_DISCEN_Pos);
+
+    // Discontinuous mode (Injected)
+    ADC1->CR1 |= (pADCHandle->Config.DiscModeInjectedChannels << ADC_CR1_JDISCEN_Pos);
+
+    // Automatic injected group conversion
+    ADC1->CR1 |= (pADCHandle->Config.AutoInjectedGroupConversion << ADC_CR1_JAUTO_Pos);
+
+    // Scan mode
+    ADC1->CR1 |= (pADCHandle->Config.ScanModeEnabled << ADC_CR1_SCAN_Pos);
+
+    // Watchdog
+    if (pADCHandle->Config.WatchdogConfig.WatchdogMode < ADC_WatchdogAllRegularChannels) {
+        // Select channel for the watchdog
+        ADC1->CR1 |= (pADCHandle->Config.WatchdogConfig.WatchdogChannel << ADC_CR1_AWDCH_Pos);
+    }
+
+    // Configure watchdog mode
+    switch (pADCHandle->Config.WatchdogConfig.WatchdogMode) {
+        case ADC_WatchdogSingleChannel:
+            ADC1->CR1 |= (1 << ADC_CR1_AWDSGL_Pos) | (1 << ADC_CR1_AWDEN_Pos) | (1 << ADC_CR1_JAWDEN_Pos);
+        break;
+        case ADC_WatchdogSingleRegularChannel:
+            ADC1->CR1 |= (1 << ADC_CR1_AWDSGL_Pos) | (1 << ADC_CR1_AWDEN_Pos);
+        break;
+        case ADC_WatchdogSingleInjectedChannel:
+            ADC1->CR1 |= (1 << ADC_CR1_AWDSGL_Pos) | (1 << ADC_CR1_JAWDEN_Pos);
+        break;
+        case ADC_WatchdogAllChannels:
+            ADC1->CR1 |= (1 << ADC_CR1_AWDEN_Pos) | (1 << ADC_CR1_JAWDEN_Pos);
+        break;
+        case ADC_WatchdogAllRegularChannels:
+            ADC1->CR1 |= (1 << ADC_CR1_AWDEN_Pos);
+        break;
+        case ADC_WatchdogAllInjectedChannels:
+            ADC1->CR1 |= (1 << ADC_CR1_JAWDEN_Pos);
+        break;
+        default:
+            // No watchdog enabled
+        break;
+    }
+
+    ADC1->HTR = pADCHandle->Config.WatchdogConfig.WatchdogHigherThreshold & 0xFFF;
+    ADC1->LTR = pADCHandle->Config.WatchdogConfig.WatchdogLowerThreshold & 0xFFF;
+
+    // Regular channel external trigger & event
+    ADC1->CR2 |= (pADCHandle->Config.RegularExternalTrigger << ADC_CR2_EXTEN_Pos);
+    ADC1->CR2 |= (pADCHandle->Config.RegularExternalEvent << ADC_CR2_EXTSEL_Pos);
+
+    // Injected channel external trigger & event
+    ADC1->CR2 |= (pADCHandle->Config.InjectedExternalTrigger << ADC_CR2_JEXTEN_Pos);
+    ADC1->CR2 |= (pADCHandle->Config.InjectedExternalEvent << ADC_CR2_JEXTSEL_Pos);
+
+    // Data alignment
+    ADC1->CR2 |= (pADCHandle->Config.DataAlignment << ADC_CR2_ALIGN_Pos);
+
+    // Continuous mode
+    ADC1->CR2 |= (pADCHandle->Config.ContinuousModeEnabled << ADC_CR2_CONT_Pos);
+
+    // Sampling times
+    for (int i = 0; i < ADC_TOTAL_CHAN_COUNT; i++) {
+        if (i < 10) {
+            ADC1->SMPR2 |= (pADCHandle->Config.SamplingTimes[i] << (i * 3));
+        } else {
+            ADC1->SMPR1 |= (pADCHandle->Config.SamplingTimes[i] << ((i - 10) * 3));
+        }
+    }
+
+    // ADC Clock Prescaler
+    ADC->CCR |= (pADCHandle->Config.Prescaler << ADC_CCR_ADCPRE_Pos);
+
+    // Temperature sensor
+    ADC->CCR |= (pADCHandle->Config.TEMPEnabled << ADC_CCR_TSVREFE_Pos);
+
+    // VBAT
+    ADC->CCR |= (pADCHandle->Config.VBATEnabled << ADC_CCR_VBATE_Pos);
+
+    // Injected channel offsets
+    for (int i = 0; i < ADC_INJECTED_CHAN_COUNT; i++) {
+        switch (i) {
+            case 0:
+                ADC1->JOFR1 = pADCHandle->Config.InjectedChanOffsets[i] & 0xFFF;
+            break;
+            case 1:
+                ADC1->JOFR2 = pADCHandle->Config.InjectedChanOffsets[i] & 0xFFF;
+            break;
+            case 2:
+                ADC1->JOFR3 = pADCHandle->Config.InjectedChanOffsets[i] & 0xFFF;
+            break;
+            case 3:
+                ADC1->JOFR4 = pADCHandle->Config.InjectedChanOffsets[i] & 0xFFF;
+            break;
+            default: break;
+        }
+    }
+
+    // Regular channel sequence
+    uint8_t regularSequenceLength = pADCHandle->Config.SampledRegularChannelsSequenceLength;
+    for (int i = 0; i < regularSequenceLength; i++) {
+        if (i < 6) {
+            ADC1->SQR3 |= (pADCHandle->Config.SampledRegularChannelsSequence[i] << (i * 5));
+        } else if (i < 12) {
+            ADC1->SQR2 |= (pADCHandle->Config.SampledRegularChannelsSequence[i] << ((i - 6) * 5));
+        } else {
+            ADC1->SQR1 |= (pADCHandle->Config.SampledRegularChannelsSequence[i] << ((i - 12) * 5));
+        }
+    }
+
+    // Regular channel sequence length
+    ADC1->SQR1 |= (regularSequenceLength > 0 ? (regularSequenceLength - 1) : 0 << ADC_SQR1_L_Pos);
+
+    // Injected channel sequence
+    uint8_t injectedSequenceLength = pADCHandle->Config.SampledInjectedChannelsSequenceLength;
+    for (int i = 0; i < injectedSequenceLength; i++) {
+        // Length == 3 => JSQ1,2,3,4; Length == 2 => JSQ2,3,4, etc...
+        ADC1->JSQR |= (pADCHandle->Config.SampledInjectedChannelsSequence[i] << ((i + (4 - injectedSequenceLength)) * 5));
+    }
+
+    // Injected channel sequence length
+    ADC1->JSQR |= ((pADCHandle->Config.SampledInjectedChannelsSequenceLength - 1) << ADC_JSQR_JL_Pos);
+
+    return ADC_ErrOK;
+}
+
+/**
+ * @brief De-Initializes the ADC peripheral
+ * @param pADCHandle ADC handle
+ */
+void ADC_DeInit(ADC_Handle_t *pADCHandle) {
+    pADCHandle->ITState.Status = ADC_ITReady;
+    pADCHandle->DMAState.DataStatus = ADC_DMADataMissing;
+    RCC->APB2RSTR |= (1 << RCC_APB2RSTR_ADCRST_Pos);
+}
+
+/**
+ * @brief Reads converted data from a single channel
+ * @note \b WARNING: This method is blocking and it is only used when there is one configured regular or injected channel!
+ * @param pADCHandle ADC handle
+ * @param Channel The desired channel from which to read
+ * @param pBuffer The buffer where to store the converted data
+ */
+ADC_Error_e ADC_ReadSingleChannel(ADC_Handle_t *pADCHandle, ADC_Channel_e Channel, uint16_t *pBuffer) {
+    if (Channel > ADC_TOTAL_CHAN_COUNT) return ADC_ErrInvalidChannel;
+
+    uint8_t regularChanLen = pADCHandle->Config.SampledRegularChannelsSequenceLength;
+    uint8_t injectedChanLen = pADCHandle->Config.SampledInjectedChannelsSequenceLength;
+    uint8_t regularChanMode = regularChanLen > 0 ? 1 : 0;
+    check_single_channel_only(pADCHandle);
+
+    if (pADCHandle->ITState.Status == ADC_ITBusy) return ADC_ErrBusy;
+    if (!(ADC1->CR2 & (1 << ADC_CR2_ADON_Pos))) return ADC_ErrPerNotEnabled;
+
+    // Start conversion
+    if (regularChanLen > 0) ADC1->CR2 |= (1 << ADC_CR2_SWSTART_Pos);
+    else if (injectedChanLen > 0) ADC1->CR2 |= (1 << ADC_CR2_JSWSTART_Pos);
+
+    WAIT_WITH_TIMEOUT(!(ADC1->SR & (1 << (regularChanMode ? ADC_SR_EOC_Pos : ADC_SR_JEOC_Pos))), ADC_ErrTimeout, ADC_TIMEOUT_MS);
+
+    // Read converted value
+    *pBuffer = regularChanMode ? ADC1->DR : ADC1->JDR1;
+
+    return ADC_ErrOK;
+}
+
+/**
+ * @brief Reads converted data from a single channel using interrupts
+ * @param pADCHandle ADC handle
+ * @param Channel The desired channel from which to read
+ * @param pBuffer The buffer where to store the converted data
+ */
+ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, ADC_Channel_e Channel, uint16_t *pBuffer) {
+    if (Channel > ADC_TOTAL_CHAN_COUNT) return ADC_ErrInvalidChannel;
+    if (pADCHandle->ITState.Status != ADC_ITReady) return ADC_ErrBusy;
+    if (pADCHandle->Config.ContinuousModeEnabled) return ADC_ErrContModeNotAllowed;
+
+    ADC_Error_e err;
+    uint8_t regularChanLen = pADCHandle->Config.SampledRegularChannelsSequenceLength;
+    uint8_t injectedChanLen = pADCHandle->Config.SampledInjectedChannelsSequenceLength;
+    if ((err = check_single_channel_only(pADCHandle)) != ADC_ErrOK) return err;
+
+    pADCHandle->ITState.Status = ADC_ITBusy;
+    pADCHandle->ITState.pBuffer = pBuffer;
+
+    // Start conversion
+    if (regularChanLen > 0) ADC1->CR2 |= (1 << ADC_CR2_SWSTART_Pos);
+    else if (injectedChanLen > 0) ADC1->CR2 |= (1 << ADC_CR2_JSWSTART_Pos);
+
+    return ADC_ErrOK;
+}
+
+/**
+ * @brief Enables the desired interrupts
+ * @param EnabledInterrupts The desired interrupts to be enabled
+ * @param Len The length of the desired interrupts
+ */
+ADC_Error_e ADC_EnableInterrupts(ADC_Handle_t *pADCHandle, ADC_Interrupt_e *EnabledInterrupts, uint8_t Len) {
+    ADC_Error_e err;
+    if ((err = check_single_channel_only(pADCHandle)) != ADC_ErrOK) return err;
+    while (Len > 0) {
+        switch (*EnabledInterrupts++) {
+            case ADC_InterruptEOC:
+                ADC1->CR1 |= (1 << ADC_CR1_EOCIE_Pos);
+            break;
+            case ADC_InterruptJEOC:
+                ADC1->CR1 |= (1 << ADC_CR1_JEOCIE_Pos);
+            break;
+            case ADC_InterruptAWD:
+                ADC1->CR1 |= (1 << ADC_CR1_AWDIE_Pos);
+            break;
+            case ADC_InterruptOVR:
+                ADC1->CR1 |= (1 << ADC_CR1_OVRIE_Pos);
+            break;
+            default: break;
+        }
+        Len--;
+    }
+    return ADC_ErrOK;
+}
+
+/**
+ * @brief Disables the desired interrupts
+ * @param DisabledInterrupts The desired interrupts to be enabled
+ * @param Len The length of the desired interrupts
+ */
+void ADC_DisableInterrupts(ADC_Interrupt_e *DisabledInterrupts, uint8_t Len) {
+    while (Len > 0) {
+        switch (*DisabledInterrupts++) {
+            case ADC_InterruptEOC:
+                ADC1->CR1 &=~ (1 << ADC_CR1_EOCIE_Pos);
+            break;
+            case ADC_InterruptJEOC:
+                ADC1->CR1 &=~ (1 << ADC_CR1_JEOCIE_Pos);
+            break;
+            case ADC_InterruptAWD:
+                ADC1->CR1 &=~ (1 << ADC_CR1_AWDIE_Pos);
+            break;
+            case ADC_InterruptOVR:
+                ADC1->CR1 &=~ (1 << ADC_CR1_OVRIE_Pos);
+            break;
+            default: break;
+        }
+        Len--;
+    }
+}
+
+/**
+ * @brief Disables all ADC interrupts
+ */
+void ADC_DisableAllInterrupts() {
+    ADC1->CR1 &=~ (1 << ADC_CR1_EOCIE_Pos);
+    ADC1->CR1 &=~ (1 << ADC_CR1_JEOCIE_Pos);
+    ADC1->CR1 &=~ (1 << ADC_CR1_AWDIE_Pos);
+    ADC1->CR1 &=~ (1 << ADC_CR1_OVRIE_Pos);
+}
+
+void ADC_IRQEnable(uint8_t IRQPriority) {
+    NVIC_EnableIRQ(ADC_IRQn);
+    NVIC_SetPriority(ADC_IRQn, IRQPriority);
+}
+
+void ADC_IRQDisable() {
+    NVIC_DisableIRQ(ADC_IRQn);
+}
+
+void ADC_IRQHandling(ADC_Handle_t *pADCHandle) {
+    if (ADC1->SR & (1 << ADC_SR_EOC_Pos)) {
+        // Regular conversion complete
+        *pADCHandle->ITState.pBuffer = ADC1->DR;
+        pADCHandle->ITState.Status = ADC_ITReady;
+        ADC_ApplicationCallback(pADCHandle, ADC_FlagEndOfRegularConversion);
+    }
+
+    if (ADC1->SR & (1 << ADC_SR_JEOC_Pos)) {
+        // Injected conversion complete
+        ADC1->SR &=~ (1 << ADC_SR_JEOC_Pos);
+
+        // JDR1 because interrupt can only be used with a single configured channel
+        *pADCHandle->ITState.pBuffer = ADC1->JDR1;
+        pADCHandle->ITState.Status = ADC_ITReady;
+        ADC_ApplicationCallback(pADCHandle, ADC_FlagEndOfInjectedConversion);
+    }
+
+    if (ADC1->SR & (1 << ADC_SR_AWD_Pos)) {
+        // Watchdog triggered
+        ADC1->SR &=~ (1 << ADC_SR_AWD_Pos);
+        ADC_ApplicationCallback(pADCHandle, ADC_FlagAnalogWatchdog);
+    }
+
+    if (ADC1->SR & (1 << ADC_SR_OVR_Pos)) {
+        // Overrun
+        ADC1->SR &=~ (1 << ADC_SR_OVR_Pos);
+        ADC_ApplicationCallback(pADCHandle, ADC_FlagOverrun);
+    }
+}
+
+__weak void ADC_ApplicationCallback(ADC_Handle_t *pADCHandle, ADC_Flag_e Flag) {};
+
+ADC_Error_e check_single_channel_only(ADC_Handle_t *pADCHandle) {
+    uint8_t regularChanLen = pADCHandle->Config.SampledRegularChannelsSequenceLength;
+    uint8_t injectedChanLen = pADCHandle->Config.SampledInjectedChannelsSequenceLength;
+    if (regularChanLen > 0) {
+        if (regularChanLen > 1 || injectedChanLen > 0) return ADC_ErrMethodNotForCorrectChannelLength;
+    } else if (injectedChanLen > 0) {
+        if (regularChanLen > 0 || injectedChanLen > 1) return ADC_ErrMethodNotForCorrectChannelLength;
+    } else if (regularChanLen == 0 || injectedChanLen == 0) {
+        return ADC_ErrNoChannelInSequence;
+    }
+
+    return ADC_ErrOK;
+}

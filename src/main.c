@@ -1,27 +1,19 @@
 
 #include <generic_methods.h>
-#include <i2c_driver.h>
-#include <ssd1306_i2c_driver.h>
-#include <stdio.h>
 #include <string.h>
 
-#include "stm32f4xx.h"
 #include "gpio_driver.h"
+#include "adc_driver.h"
 
 /*
- * I2C GPIOs:
- * SDA      =>  PB7
- * SCL      =>  PB8
+ * ADC GPIO: PA4 (ADC1_IN4)
 */
 
 #define LED_PIN             13
 #define BTN_PIN             0
-
-#define I2C_SDA             7
-#define I2C_SCL             8
+#define ADC_PIN             4
 
 volatile uint8_t button_trigger = 0;
-uint8_t counter = 0;
 
 GPIO_Handle_t gpioHandle = {
     .pGPIOx = GPIOC,
@@ -34,22 +26,25 @@ GPIO_Handle_t gpioHandle = {
     }
 };
 
-I2C_Handle_t i2cHandle = {
-    .pI2Cx = I2C1
-};
-
-SSD1306_Handle_t display = {
+ADC_Handle_t adcHandle = {
     .Config = {
-        .I2CHandle = &i2cHandle
+        .Prescaler = ADC_Perscaler2,
+        .Resolution = ADC_Resolution12bit,
+        .DataAlignment = ADC_DataAlignRight,
+        .SamplingTimes = {0},
+        .ScanModeEnabled = DISABLE,
+        .AutoInjectedGroupConversion = DISABLE,
+        .ContinuousModeEnabled = DISABLE,
+        .WatchdogConfig = {
+            .WatchdogMode = ADC_WatchdogSingleRegularChannel,
+            .WatchdogChannel = ADC_WatchdogChan4,
+            .WatchdogHigherThreshold = 3000,
+            .WatchdogLowerThreshold = 1000
+        },
+        .SampledRegularChannelsSequence = {ADC_Channel4},
+        .SampledRegularChannelsSequenceLength = 1,
+        .SampledInjectedChannelsSequenceLength = 0
     }
-};
-
-const uint8_t tempImg[] = {
-    0xff, 0xff, 0xff, 0xff, 0xc3, 0xff, 0xff, 0x81, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff,
-    0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99,
-    0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x99, 0xff, 0xff, 0x18, 0xff, 0xff, 0x3c, 0xff,
-    0xfe, 0x7e, 0x7f, 0xfe, 0x7e, 0x7f, 0xfe, 0x7e, 0x7f, 0xfe, 0x7e, 0x7f, 0xff, 0x3c, 0xff, 0xff,
-    0x00, 0xff, 0xff, 0xc3, 0xff, 0xff, 0xff, 0xff
 };
 
 int main(void) {
@@ -64,24 +59,28 @@ int main(void) {
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
-    // Init I2C SCL
-    gpioHandle.pGPIOx = GPIOB;
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SCL;
-    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAlternate;
-    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
-    gpioHandle.GPIO_PinConfig.GPIO_PinOPType = GPIO_OpTypeOD;
-    gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF4;
+    // Init ADC GPIO
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = ADC_PIN;
+    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl =  GPIO_NoPuPd;
+    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAnalog;
     GPIO_Init(&gpioHandle);
 
-    // Init I2C SDA
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SDA;
-    GPIO_Init(&gpioHandle);
+    // Init ADC
+    ADC_PeriClockControl(ENABLE);
+    ADC_Init(&adcHandle);
 
-    // Setup the display
-    SSD1306_Init(&display);
-    SSD1306_SetMemoryAddrMode(&display, SSD1306_MemAddrPage);
-    SSD1306_SetCursor(&display, 0, SSD1306_Page0);
-    SSD1306_DisplayControl(&display, ENABLE);
+    ADC_Interrupt_e adcInterrupts[4] = {
+        ADC_InterruptEOC,
+        ADC_InterruptJEOC,
+        ADC_InterruptAWD,
+        ADC_InterruptOVR
+    };
+    ADC_EnableInterrupts(&adcHandle, adcInterrupts, 4);
+    ADC_IRQEnable(1);
+
+    ADC_PeripheralControl(ENABLE);
+
+    Generic_InitSysTick();
 
     while (1) {
         if (button_trigger) {
@@ -89,16 +88,11 @@ int main(void) {
             for (int i = 0; i < 1000000; i++);
 
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
-            SSD1306_Clear(&display);
-            SSD1306_SetCursor(&display, counter, SSD1306_Page0);
-            SSD1306_Write(&display, "Hello, World ");
 
-            char buffer[16];
-            sprintf(buffer, "%d", counter);
-            SSD1306_Write(&display, buffer);
-
+            uint16_t buffer = 0;
+            ADC_Error_e err = ADC_ReadSingleChannelIT(&adcHandle, ADC_Channel4, &buffer);
+            (void)err;
             button_trigger = 0;
-            counter++;
         }
     };
 }
@@ -106,4 +100,20 @@ int main(void) {
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
     button_trigger = 1;
+}
+
+void ADC_IRQHandler() {
+    ADC_IRQHandling(&adcHandle);
+}
+
+void ADC_ApplicationCallback(ADC_Handle_t *pADCHandle, ADC_Flag_e Flag) {
+    uint16_t value;
+    if (Flag == ADC_FlagEndOfRegularConversion) {
+        value = *pADCHandle->ITState.pBuffer;
+    } else if (Flag == ADC_FlagEndOfInjectedConversion) {
+        value = *pADCHandle->ITState.pBuffer;
+    } else if (Flag == ADC_FlagAnalogWatchdog) {
+        GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+    }
+    (void)value;
 }

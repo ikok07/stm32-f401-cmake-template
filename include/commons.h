@@ -12,7 +12,7 @@
 
 #define __weak             __attribute__((weak))
 
-#define WAIT_WITH_TIMEOUT(cb, err, timeoutMS)           do {\
+#define WAIT_WITH_TIMEOUT(cb, err, timeoutMS, ...)      do {\
                                                             uint32_t startTicks, currTicks; \
                                                             SYSTICK_Error_e sysTickErr = SYSTICK_GetCurrTicks(&startTicks); \
                                                             if ((sysTickErr = SYSTICK_GetCurrTicks(&currTicks)) != SYSTICK_ErrOK) return err; \
