@@ -93,7 +93,7 @@ int main(void) {
     ADC_Interrupt_e adcInterrupts[] = {ADC_InterruptEOC};
     ADC_EnableInterrupts(&adcHandle, adcInterrupts, 1);
     ADC_IRQEnable(1);
-    ADC_ConfigureSingleChannelExternalTriggerIT(&adcHandle, adcBuffer);
+    ADC_ConfigureExternalTriggerIT(&adcHandle, adcBuffer, 1);
 
     // Init TIM1
     TIM_PeriClockControl(timHandle.pTIMx, ENABLE);

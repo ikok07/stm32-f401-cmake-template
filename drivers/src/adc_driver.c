@@ -301,7 +301,8 @@ ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer)
  * @param pADCHandle ADC Handle
  * @param pBuffer The buffer where to store the data
  */
-ADC_Error_e ADC_ConfigureSingleChannelExternalTriggerIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer) {
+ADC_Error_e ADC_ConfigureExternalTriggerIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount) {
+    if (ChannelCount > ADC_TOTAL_CHAN_COUNT) return ADC_ErrInvalidChannelCount;
     if (pADCHandle->Config.ContinuousModeEnabled) return ADC_ErrContModeNotAllowed;
 
     ADC_Error_e err;
@@ -312,7 +313,7 @@ ADC_Error_e ADC_ConfigureSingleChannelExternalTriggerIT(ADC_Handle_t *pADCHandle
     if (regularChanMode ? ADC_IsRegularConversionEnabled() : ADC_IsInjectedConversionEnabled()) return ADC_ErrBusy;
 
     pADCHandle->ITState.pBuffer = pBuffer;
-    pADCHandle->ITState.Len = 1;
+    pADCHandle->ITState.Len = ChannelCount;
 
     return ADC_ErrOK;
 }

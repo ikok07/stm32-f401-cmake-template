@@ -1,3 +1,7 @@
+//
+// Created by Kok on 7/7/25.
+//
+
 
 #include <clock_driver.h>
 #include <generic_methods.h>
@@ -18,7 +22,6 @@
 #define TIM_PIN             8
 
 volatile uint8_t button_trigger = 0;
-uint16_t adcBuffer[2];
 
 GPIO_Handle_t gpioHandle = {
     .pGPIOx = GPIOC,
@@ -40,11 +43,11 @@ ADC_Handle_t adcHandle = {
         .ScanModeEnabled = ENABLE,
         .AutoInjectedGroupConversion = DISABLE,
         .ContinuousModeEnabled = DISABLE,
-        .InjectedExternalTrigger = ADC_ExternalTriggerREdge,
-        .InjectedExternalEvent = ADC_InjectedExternalEventTIM1CC4,
-        .SampledInjectedChannelsSequence = {ADC_Channel3, ADC_Channel4},
-        .SampledInjectedChannelsSequenceLength = 2,
-        .SampledRegularChannelsSequenceLength = 0,
+        .RegularExternalTrigger = ADC_ExternalTriggerREdge,
+        .RegularExternalEvent = ADC_RegularExternalEventTIM1CC1,
+        .SampledRegularChannelsSequence = {ADC_Channel3, ADC_Channel4},
+        .SampledRegularChannelsSequenceLength = 2,
+        .SampledInjectedChannelsSequenceLength = 0,
         .DMAConfig = {
             .Enabled = ENABLE
         }
@@ -89,10 +92,7 @@ int main(void) {
     ADC_PeriClockControl(ENABLE);
     ADC_Error_e err = ADC_Init(&adcHandle);
     ADC_PeripheralControl(ENABLE);
-    ADC_Interrupt_e interrupts[] = {ADC_InterruptJEOC, ADC_InterruptOVR};
-    ADC_EnableInterrupts(&adcHandle, interrupts, 2);
-    ADC_IRQEnable(1);
-    ADC_ConfigureExternalTriggerIT(&adcHandle, adcBuffer, 2);
+    err = ADC_ConfigureDMA(&adcHandle);
 
     // Init TIM1
     TIM_PeriClockControl(timHandle.pTIMx, ENABLE);
@@ -102,13 +102,13 @@ int main(void) {
         .Mode = TIM_OutputCompareMode4,
         .Preload = ENABLE
     };
-    TIM_ConfigureOutputCompare(&timHandle, TIM_CaptureCompareChan4, outputCompareConfig);
-    TIM_CaptureCompareChannelControl(&timHandle, TIM_CaptureCompareChan4, ENABLE);
+    TIM_ConfigureOutputCompare(&timHandle, TIM_CaptureCompareChan1, outputCompareConfig);
+    TIM_CaptureCompareChannelControl(&timHandle, TIM_CaptureCompareChan1, ENABLE);
 
     uint32_t pclk2 = CLOCK_GetApb2Hz();
     TIM_SetPrescaler(&timHandle, ((pclk2 / 1000000) * 1000) - 1);        // 1KHz
     TIM_SetAutoReload(&timHandle, 1000 - 1);        // 1s
-    TIM_SetCompareValue(&timHandle, TIM_CaptureCompareChan4, 1000 - 1);
+    TIM_SetCompareValue(&timHandle, TIM_CaptureCompareChan1, 1000 - 1);
 
     TIM_EnableInterrupts(&timHandle, TIM_IT_CC1);
 
@@ -150,8 +150,8 @@ void ADC_IRQHandler() {
 }
 
 void TIM1_CC_IRQHandler() {
-    if (TIM_GetStatusFlag(&timHandle, TIM_FlagCC4)) {
-        TIM_ClearStatusFlag(&timHandle, TIM_FlagCC4);
+    if (TIM_GetStatusFlag(&timHandle, TIM_FlagCC1)) {
+        TIM_ClearStatusFlag(&timHandle, TIM_FlagCC1);
         GPIO_ToggleOutputPin(GPIOC, LED_PIN);
     }
 }

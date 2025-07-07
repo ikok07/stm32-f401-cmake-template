@@ -284,7 +284,7 @@ ADC_Error_e ADC_UpdateInjectedSequence(ADC_Handle_t *pADCHandle, ADC_Channel_e *
  */
 ADC_Error_e ADC_ReadSingleChannel(ADC_Handle_t *pADCHandle, uint16_t *pBuffer);
 ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer);
-ADC_Error_e ADC_ConfigureSingleChannelExternalTriggerIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer);
+ADC_Error_e ADC_ConfigureExternalTriggerIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
 ADC_Error_e ADC_ReadInjectedChannelsIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
 
 // DMA only
