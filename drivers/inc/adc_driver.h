@@ -29,12 +29,15 @@ typedef enum {
     ADC_ErrBusy,
     ADC_ErrTimeout,
     ADC_ErrPerNotEnabled,
+    ADD_ErrConvNotEnabled,
     ADC_ErrWatchdogThresInvalid,
     ADC_ErrInvalidSequenceLength,
     ADC_ErrInvalidChannel,
+    ADC_ErrInvalidChannelCount,
     ADC_ErrMethodNotForCorrectChannelLength,
     ADC_ErrContModeNotAllowed,
     ADC_ErrNoChannelInSequence,
+    ADC_ErrDMADisabled,
     ADC_ErrDMAFailed
 } ADC_Error_e;
 
@@ -190,11 +193,6 @@ typedef enum {
 } ADC_Flag_e;
 
 typedef enum {
-    ADC_ITReady,
-    ADC_ITBusy,
-} ADC_ITStatus;
-
-typedef enum {
     ADC_DMADataReady,
     ADC_DMADataMissing,
 } ADC_DMADataStatus;
@@ -207,8 +205,11 @@ typedef struct {
 } ADC_WatchdogConfig_t;
 
 typedef struct {
-
-} ADC_SamplingOption_t;
+    uint8_t Enabled;                // When having more than one configured channel, the DMA is always enabled
+    DMA_Interrupt_e *EnabledInterrupts;
+    uint8_t InterruptsLength;
+    uint8_t InterruptsPriority;
+} ADC_DMAConfig_t;
 
 typedef struct {
     ADC_Resolution_e Resolution;
@@ -218,6 +219,7 @@ typedef struct {
     uint8_t AutoInjectedGroupConversion;
     uint8_t ScanModeEnabled;
     ADC_WatchdogConfig_t WatchdogConfig;
+    ADC_DMAConfig_t DMAConfig;
     ADC_ExternalTrigger_e RegularExternalTrigger;
     ADC_ExternalTrigger_e InjectedExternalTrigger;
     ADC_RegularExternalEvent_e RegularExternalEvent;
@@ -225,7 +227,7 @@ typedef struct {
     ADC_DataAlign_e DataAlignment;
     ADC_SamplingTime_e SamplingTimes[ADC_TOTAL_CHAN_COUNT];
     ADC_Prescaler_e Prescaler;
-    uint8_t ContinuousModeEnabled;
+    uint8_t ContinuousModeEnabled;                  // Valid only for regular channels
     uint8_t VBATEnabled;
     uint8_t TEMPEnabled;
     uint16_t InjectedChanOffsets[ADC_INJECTED_CHAN_COUNT];
@@ -233,17 +235,16 @@ typedef struct {
     ADC_Channel_e SampledInjectedChannelsSequence[ADC_INJECTED_CHAN_SEQUENCE_LEN];          // Array of the desired injected channel sequence
     uint8_t SampledRegularChannelsSequenceLength;
     uint8_t SampledInjectedChannelsSequenceLength;
-    uint8_t DMAInterruptPriority;
 } ADC_Config_t;
 
 typedef struct {
-    ADC_ITStatus Status;
     uint16_t *pBuffer;
+    uint8_t Len;
 } ADC_ITState;
 
 typedef struct {
     DMA_Handle_t DMAHandle;
-    ADC_DMADataStatus DataStatus;
+    uint16_t Samples[ADC_TOTAL_CHAN_COUNT];
 } ADC_DMAState;
 
 typedef struct {
@@ -261,25 +262,39 @@ void ADC_PeriClockControl(uint8_t Enabled);
 void ADC_PeripheralControl(uint8_t Enabled);
 
 /*
+ * Status
+ */
+uint8_t ADC_CheckRegularConversionEnabled();
+uint8_t ADC_CheckInjectedConversionEnabled();
+
+/*
  * Init and De-Init
  */
 ADC_Error_e ADC_Init(ADC_Handle_t *pADCHandle);
 void ADC_DeInit(ADC_Handle_t *pADCHandle);
 
 /*
+ * Sequence control
+ */
+ADC_Error_e ADC_UpdateRegularSequence(ADC_Handle_t *pADCHandle, ADC_Channel_e *RegularChannels, uint8_t ChannelCount);
+ADC_Error_e ADC_UpdateInjectedSequence(ADC_Handle_t *pADCHandle, ADC_Channel_e *InjectedChannels, uint8_t ChannelCount);
+
+/*
  * Data sampling
  */
-ADC_Error_e ADC_ReadSingleChannel(ADC_Handle_t *pADCHandle, ADC_Channel_e Channel, uint16_t *pBuffer);
-ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, ADC_Channel_e Channel, uint16_t *pBuffer);
+ADC_Error_e ADC_ReadSingleChannel(ADC_Handle_t *pADCHandle, uint16_t *pBuffer);
+ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer);
+ADC_Error_e ADC_ReadMultipleInjectedChannelsIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
 
 // DMA only
-ADC_Error_e ADC_StartRegularMultiChannelRead(ADC_Handle_t *pADCHandle);
-ADC_Error_e ADC_ReadMultipleRegularChannels(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
+ADC_Error_e ADC_StartRegularChannelsReadDMA(ADC_Handle_t *pADCHandle);
+void ADC_StopRegularContinuousChannelsConversionDMA(ADC_Handle_t *pADCHandle);
+
 
 /*
  * IRQ Handling
  */
-ADC_Error_e ADC_EnableInterrupts(ADC_Handle_t *pADCHandle, ADC_Interrupt_e *EnabledInterrupts, uint8_t Len);
+void ADC_EnableInterrupts(ADC_Handle_t *pADCHandle, ADC_Interrupt_e *EnabledInterrupts, uint8_t Len);
 void ADC_DisableInterrupts(ADC_Interrupt_e *DisabledInterrupts, uint8_t Len);
 void ADC_DisableAllInterrupts();
 

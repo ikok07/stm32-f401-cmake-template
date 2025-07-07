@@ -1,3 +1,7 @@
+//
+// Created by Kok on 7/7/25.
+//
+
 
 #include <generic_methods.h>
 #include <string.h>
@@ -35,12 +39,19 @@ ADC_Handle_t adcHandle = {
         .SamplingTimes = {0},
         .ScanModeEnabled = ENABLE,
         .AutoInjectedGroupConversion = DISABLE,
-        .ContinuousModeEnabled = ENABLE,
-        .SampledRegularChannelsSequence = {ADC_Channel4},
-        .SampledRegularChannelsSequenceLength = 1,
-        .SampledInjectedChannelsSequenceLength = 0,
+        .ContinuousModeEnabled = DISABLE,           // Only for regular channels
+        .WatchdogConfig = {
+            .WatchdogMode = ADC_WatchdogSingleRegularChannel,
+            .WatchdogChannel = ADC_WatchdogChan4,
+            .WatchdogHigherThreshold = 3000,
+            .WatchdogLowerThreshold = 1000
+        },
+        // .SampledRegularChannelsSequence = {ADC_Channel3, ADC_Channel4},
+        .SampledRegularChannelsSequenceLength = 0,
+        .SampledInjectedChannelsSequence = {ADC_Channel3, ADC_Channel4},
+        .SampledInjectedChannelsSequenceLength = 2,
         .DMAConfig = {
-            .Enabled = ENABLE
+            .Enabled = DISABLE
         }
     }
 };
@@ -66,19 +77,22 @@ int main(void) {
     gpioHandle.GPIO_PinConfig.GPIO_PinNumber = ADC2_PIN;
     GPIO_Init(&gpioHandle);
 
-    Generic_InitSysTick();
-
     // Init ADC
     ADC_PeriClockControl(ENABLE);
     ADC_Error_e err = ADC_Init(&adcHandle);
 
+    ADC_Interrupt_e adcInterrupts[4] = {
+        ADC_InterruptEOC,
+        ADC_InterruptJEOC,
+        ADC_InterruptAWD,
+        ADC_InterruptOVR
+    };
+    ADC_EnableInterrupts(&adcHandle, adcInterrupts, 4);
+    ADC_IRQEnable(1);
+
     ADC_PeripheralControl(ENABLE);
 
-    err = ADC_StartRegularChannelsReadDMA(&adcHandle);
-
-    // Update channel sequence on the go
-    ADC_Channel_e newChannels[2] = {ADC_Channel4, ADC_Channel3};
-    ADC_UpdateRegularSequence(&adcHandle, newChannels, 2);
+    Generic_InitSysTick();
 
     while (1) {
         if (button_trigger) {
@@ -87,6 +101,8 @@ int main(void) {
 
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
 
+            uint16_t buffer[2] = {0};
+            err = ADC_ReadMultipleInjectedChannelsIT(&adcHandle, buffer, 2);
             (void)err;
             button_trigger = 0;
         }
@@ -96,4 +112,20 @@ int main(void) {
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
     button_trigger = 1;
+}
+
+void ADC_IRQHandler() {
+    ADC_IRQHandling(&adcHandle);
+}
+
+void ADC_ApplicationCallback(ADC_Handle_t *pADCHandle, ADC_Flag_e Flag) {
+    uint16_t value;
+    if (Flag == ADC_FlagEndOfRegularConversion) {
+        value = *pADCHandle->ITState.pBuffer;
+    } else if (Flag == ADC_FlagEndOfInjectedConversion) {
+        value = *pADCHandle->ITState.pBuffer;
+    } else if (Flag == ADC_FlagAnalogWatchdog) {
+        GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+    }
+    (void)value;
 }
