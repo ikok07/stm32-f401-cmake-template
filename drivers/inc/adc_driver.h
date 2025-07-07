@@ -264,8 +264,8 @@ void ADC_PeripheralControl(uint8_t Enabled);
 /*
  * Status
  */
-uint8_t ADC_CheckRegularConversionEnabled();
-uint8_t ADC_CheckInjectedConversionEnabled();
+uint8_t ADC_IsRegularConversionEnabled();
+uint8_t ADC_IsInjectedConversionEnabled();
 
 /*
  * Init and De-Init
@@ -284,12 +284,14 @@ ADC_Error_e ADC_UpdateInjectedSequence(ADC_Handle_t *pADCHandle, ADC_Channel_e *
  */
 ADC_Error_e ADC_ReadSingleChannel(ADC_Handle_t *pADCHandle, uint16_t *pBuffer);
 ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer);
-ADC_Error_e ADC_ReadMultipleInjectedChannelsIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
+ADC_Error_e ADC_ConfigureSingleChannelExternalTriggerIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer);
+ADC_Error_e ADC_ReadInjectedChannelsIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount);
 
 // DMA only
-ADC_Error_e ADC_StartRegularChannelsReadDMA(ADC_Handle_t *pADCHandle);
-void ADC_StopRegularContinuousChannelsConversionDMA(ADC_Handle_t *pADCHandle);
-
+ADC_Error_e ADC_ConfigureDMA(ADC_Handle_t *pADCHandle);
+ADC_Error_e ADC_StartDMA(ADC_Handle_t *pADCHandle);
+void ADC_StopDMA(ADC_Handle_t *pADCHandle);
+ADC_Error_e ADC_RestartDMA(ADC_Handle_t *pADCHandle);
 
 /*
  * IRQ Handling

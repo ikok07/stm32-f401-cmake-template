@@ -19,7 +19,6 @@ static void set_injected_channel_sequence(ADC_Channel_e *InjectedChannels, uint8
 
 static void enable_adc_dma(ADC_Handle_t *pADCHandle);
 ADC_Error_e configure_adc_dma(ADC_Handle_t *pADCHandle);
-static ADC_Error_e reset_adc_dma(ADC_Handle_t *pADCHandle);
 
 /**
  * @brief Controls the peripheral's clock
@@ -45,11 +44,11 @@ void ADC_PeripheralControl(uint8_t Enabled) {
     }
 }
 
-uint8_t ADC_CheckRegularConversionEnabled() {
+uint8_t ADC_IsRegularConversionEnabled() {
     return (ADC1->CR2 & (1 << ADC_CR2_SWSTART_Pos)) > 0;
 }
 
-uint8_t ADC_CheckInjectedConversionEnabled() {
+uint8_t ADC_IsInjectedConversionEnabled() {
     return (ADC1->CR2 & (1 << ADC_CR2_JSWSTART_Pos)) > 0;
 }
 
@@ -219,7 +218,7 @@ ADC_Error_e ADC_UpdateRegularSequence(ADC_Handle_t *pADCHandle, ADC_Channel_e *R
     pADCHandle->Config.SampledRegularChannelsSequenceLength = ChannelCount;
 
     // Reset DMA
-    reset_adc_dma(pADCHandle);
+    ADC_RestartDMA(pADCHandle);
 
     // Restart conversion
     ADC1->CR2 |= (1 << ADC_CR2_SWSTART_Pos);
@@ -258,7 +257,7 @@ ADC_Error_e ADC_ReadSingleChannel(ADC_Handle_t *pADCHandle, uint16_t *pBuffer) {
     uint8_t regularChanMode = regularChanLen > 0 ? 1 : 0;
     if ((err = check_single_channel_only(pADCHandle)) != ADC_ErrOK) return err;
 
-    if (regularChanMode ? ADC_CheckRegularConversionEnabled() : ADC_CheckInjectedConversionEnabled()) return ADC_ErrBusy;
+    if (regularChanMode ? ADC_IsRegularConversionEnabled() : ADC_IsInjectedConversionEnabled()) return ADC_ErrBusy;
 
     // Start conversion
     if (regularChanMode) ADC1->CR2 |= (1 << ADC_CR2_SWSTART_Pos);
@@ -285,7 +284,7 @@ ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer)
     uint8_t regularChanMode = regularChanLen > 0 ? 1 : 0;
     if ((err = check_single_channel_only(pADCHandle)) != ADC_ErrOK) return err;
 
-    if (regularChanMode ? ADC_CheckRegularConversionEnabled() : ADC_CheckInjectedConversionEnabled()) return ADC_ErrBusy;
+    if (regularChanMode ? ADC_IsRegularConversionEnabled() : ADC_IsInjectedConversionEnabled()) return ADC_ErrBusy;
 
     pADCHandle->ITState.pBuffer = pBuffer;
     pADCHandle->ITState.Len = 1;
@@ -298,12 +297,33 @@ ADC_Error_e ADC_ReadSingleChannelIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer)
 }
 
 /**
+ * @brief Configures the ADC to wait for external trigger in order to sample data from a single channel
+ * @param pADCHandle ADC Handle
+ * @param pBuffer The buffer where to store the data
+ */
+ADC_Error_e ADC_ConfigureSingleChannelExternalTriggerIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer) {
+    if (pADCHandle->Config.ContinuousModeEnabled) return ADC_ErrContModeNotAllowed;
+
+    ADC_Error_e err;
+    uint8_t regularChanLen = pADCHandle->Config.SampledRegularChannelsSequenceLength;
+    uint8_t regularChanMode = regularChanLen > 0 ? 1 : 0;
+    if ((err = check_single_channel_only(pADCHandle)) != ADC_ErrOK) return err;
+
+    if (regularChanMode ? ADC_IsRegularConversionEnabled() : ADC_IsInjectedConversionEnabled()) return ADC_ErrBusy;
+
+    pADCHandle->ITState.pBuffer = pBuffer;
+    pADCHandle->ITState.Len = 1;
+
+    return ADC_ErrOK;
+}
+
+/**
  * @brief Reads converted data from a multiple \b INJECTED channels using interrupts
  * @param pADCHandle ADC Handle
  * @param pBuffer Buffer where to store the converted data
  * @param ChannelCount The desired count of channels to read
  */
-ADC_Error_e ADC_ReadMultipleInjectedChannelsIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount) {
+ADC_Error_e ADC_ReadInjectedChannelsIT(ADC_Handle_t *pADCHandle, uint16_t *pBuffer, uint8_t ChannelCount) {
     if (ChannelCount > ADC_TOTAL_CHAN_COUNT) return ADC_ErrInvalidChannelCount;
 
     uint8_t injectedChanLen = pADCHandle->Config.SampledInjectedChannelsSequenceLength;
@@ -318,10 +338,27 @@ ADC_Error_e ADC_ReadMultipleInjectedChannelsIT(ADC_Handle_t *pADCHandle, uint16_
 }
 
 /**
+ * @brief Configures ADC's DMA controller in order to be ready to transfer data when conversion is available
+ * @param pADCHandle
+ */
+ADC_Error_e ADC_ConfigureDMA(ADC_Handle_t *pADCHandle) {
+    uint8_t regularChanLen = pADCHandle->Config.SampledRegularChannelsSequenceLength;
+    if (regularChanLen == 0) return ADC_ErrNoChannelInSequence;
+    if ((ADC1->CR2 & (1 << ADC_CR2_DMA_Pos)) == 0) return ADC_ErrDMADisabled;
+    if (ADC_IsRegularConversionEnabled()) return ADC_ErrBusy;
+
+    ADC_Error_e err = ADC_ErrOK;
+    if ((err = configure_adc_dma(pADCHandle)) != ADC_ErrOK) return err;
+
+    DMA_StartTransaction(&pADCHandle->DMAState.DMAHandle);
+    return err;
+}
+
+/**
  * @brief Stops all conversions for the regular channels and also stops the DMA transactions
  * @param pADCHandle ADC handle
  */
-void ADC_StopRegularContinuousChannelsConversionDMA(ADC_Handle_t *pADCHandle) {
+void ADC_StopDMA(ADC_Handle_t *pADCHandle) {
     // Stop conversions
     ADC1->CR2 &=~ (1 << ADC_CR2_CONT_Pos);
     pADCHandle->Config.ContinuousModeEnabled = DISABLE;
@@ -331,19 +368,26 @@ void ADC_StopRegularContinuousChannelsConversionDMA(ADC_Handle_t *pADCHandle) {
 }
 
 /**
+ * @brief Restarts the DMA transactions. Used in order to handle ADC errors
+ * @param pADCHandle ADC Handle
+ */
+ADC_Error_e ADC_RestartDMA(ADC_Handle_t *pADCHandle) {
+    DMA_StopTransaction(&pADCHandle->DMAState.DMAHandle);
+    ADC_Error_e err = ADC_ErrOK;
+    if ((err = configure_adc_dma(pADCHandle)) != ADC_ErrOK) return err;
+    DMA_StartTransaction(&pADCHandle->DMAState.DMAHandle);
+
+    return err;
+}
+
+/**
  * @brief Starts ADC's \b REGULAR \b CHANNELS conversion and activates the DMA. This method works for both single and multiple regular channels
  * @param pADCHandle ADC handle
  */
-ADC_Error_e ADC_StartRegularChannelsReadDMA(ADC_Handle_t *pADCHandle) {
-    uint8_t regularChanLen = pADCHandle->Config.SampledRegularChannelsSequenceLength;
-    if (regularChanLen == 0) return ADC_ErrNoChannelInSequence;
-    if ((ADC1->CR2 & (1 << ADC_CR2_DMA_Pos)) == 0) return ADC_ErrDMADisabled;
-    if (ADC_CheckRegularConversionEnabled()) return ADC_ErrBusy;
+ADC_Error_e ADC_StartDMA(ADC_Handle_t *pADCHandle) {
+    ADC_Error_e err = ADC_ConfigureDMA(pADCHandle);
+    if (err != ADC_ErrOK) return err;
 
-    ADC_Error_e err;
-    if ((err = configure_adc_dma(pADCHandle)) != ADC_ErrOK) return err;
-
-    DMA_StartTransaction(&pADCHandle->DMAState.DMAHandle);
     ADC1->CR2 |= (1 << ADC_CR2_SWSTART_Pos);
 
     return err;
@@ -447,6 +491,7 @@ void ADC_IRQHandling(ADC_Handle_t *pADCHandle) {
     if (check_interrupt_enabled(ADC_InterruptOVR) && get_interrupt_flag(ADC_InterruptOVR)) {
         // Overrun
         ADC1->SR &=~ (1 << ADC_SR_OVR_Pos);
+        ADC_RestartDMA(pADCHandle);
         ADC_ApplicationCallback(pADCHandle, ADC_FlagOverrun);
     }
 }
@@ -501,11 +546,13 @@ void enable_adc_dma(ADC_Handle_t *pADCHandle) {
     // Generate DMA requests as long as data is converted
     ADC1->CR2 |= (1 << ADC_CR2_DDS_Pos);
 
+    uint8_t circModeEnabled = pADCHandle->Config.RegularExternalTrigger ? 1 : pADCHandle->Config.ContinuousModeEnabled;
+
     DMA_Config_t dmaConfig = {
         .Channel = DMA_Channel0,
         .Direction = DMA_DirPerToMem,
         .Priority = DMA_PriorityMedium,
-        .CircularMode = pADCHandle->Config.ContinuousModeEnabled,
+        .CircularMode = circModeEnabled,
         .FlowController = DMA_FlowController,
         .DirectModeDisabled = DISABLE,
         .DoubleBufferMode = DISABLE,
@@ -528,15 +575,6 @@ void enable_adc_dma(ADC_Handle_t *pADCHandle) {
         DMA_EnableInterrupts(&pADCHandle->DMAState.DMAHandle, pADCHandle->Config.DMAConfig.EnabledInterrupts, pADCHandle->Config.DMAConfig.InterruptsLength);
         DMA_IRQEnable(&pADCHandle->DMAState.DMAHandle, pADCHandle->Config.DMAConfig.InterruptsPriority);
     }
-}
-
-ADC_Error_e reset_adc_dma(ADC_Handle_t *pADCHandle) {
-    DMA_StopTransaction(&pADCHandle->DMAState.DMAHandle);
-    ADC_Error_e err = ADC_ErrOK;
-    if ((err = configure_adc_dma(pADCHandle)) != ADC_ErrOK) return err;
-    DMA_StartTransaction(&pADCHandle->DMAState.DMAHandle);
-
-    return err;
 }
 
 ADC_Error_e configure_adc_dma(ADC_Handle_t *pADCHandle) {
