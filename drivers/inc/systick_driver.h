@@ -44,8 +44,7 @@ SYSTICK_Error_e SYSTICK_Init(SYSTICK_Config_t Config);
 /*
  * Ticks controls
  */
-void SYSTICK_StartTickCounter();
-SYSTICK_Error_e SYSTICK_GetCurrTicks();
+SYSTICK_Error_e SYSTICK_GetCurrTicks(uint32_t *ticks);
 void SYSTICK_ClearTickCounter();
 
 /*

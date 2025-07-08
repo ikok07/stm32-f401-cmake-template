@@ -1,3 +1,7 @@
+//
+// Created by Kok on 7/8/25.
+//
+
 
 #include <clock_driver.h>
 #include <generic_methods.h>
@@ -24,7 +28,7 @@ uint16_t adcBuffer[2];
 PWR_Handle_t pwrHandle = {
     .Config = {
         .BackupRegulatorEnabled = DISABLE,
-        .RegulatorVoltageScaling = PWR_RegulatorScale2,
+        .RegulatorVoltageScaling = PWR_RegulatorScale3,
         .PVDEnabled = DISABLE,
         .LowPowerRegulatorInStopMode = ENABLE,
         .LowPowerRegulatorLowVoltageEnabled = ENABLE,
@@ -44,24 +48,6 @@ GPIO_Handle_t gpioHandle = {
         .GPIO_PinOPType = GPIO_OpTypePP,
         .GPIO_PinPuPdControl = GPIO_NoPuPd,
         .GPIO_PinSpeed = GPIO_SpeedHigh
-    }
-};
-
-ADC_Handle_t adcHandle = {
-    .Config = {
-        .Prescaler = ADC_Perscaler2,
-        .Resolution = ADC_Resolution12bit,
-        .DataAlignment = ADC_DataAlignRight,
-        .SamplingTimes = {0},
-        .ScanModeEnabled = ENABLE,
-        .AutoInjectedGroupConversion = DISABLE,
-        .ContinuousModeEnabled = DISABLE,
-        .SampledRegularChannelsSequence = {ADC_Channel3, ADC_Channel4},
-        .SampledRegularChannelsSequenceLength = 2,
-        .SampledInjectedChannelsSequenceLength = 0,
-        .DMAConfig = {
-            .Enabled = ENABLE
-        }
     }
 };
 
@@ -103,11 +89,6 @@ int main(void) {
 
     // Start SysTick
     Generic_InitSysTick();
-
-    // Init ADC
-    ADC_PeriClockControl(ENABLE);
-    ADC_Error_e err = ADC_Init(&adcHandle);
-    ADC_PeripheralControl(ENABLE);
 
     // Init TIM1
     TIM_PeriClockControl(timHandle.pTIMx, ENABLE);

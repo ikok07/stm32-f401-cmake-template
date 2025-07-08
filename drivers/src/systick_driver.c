@@ -27,14 +27,9 @@ SYSTICK_Error_e SYSTICK_Init(SYSTICK_Config_t Config) {
     // Interrupt state
     SysTick->CTRL |= (Config.InterruptsStatus << SysTick_CTRL_TICKINT_Pos);
 
-    if (Config.TickCounterEnabled) SYSTICK_StartTickCounter();
+    if (Config.TickCounterEnabled) SYSTICK_CounterControl(ENABLE);;
 
     return SYSTICK_ErrOK;
-}
-
-
-void SYSTICK_StartTickCounter() {
-    SYSTICK_CounterControl(ENABLE);
 }
 
 SYSTICK_Error_e SYSTICK_GetCurrTicks(uint32_t *ticks) {
