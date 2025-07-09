@@ -65,6 +65,7 @@ set (PROJECT_SOURCES
 	drivers/src/adc_driver.c
 	drivers/src/dma_driver.c
 	drivers/src/power_driver.c
+	drivers/src/rtc_driver.c
 )
 
 set (PROJECT_DEFINES
