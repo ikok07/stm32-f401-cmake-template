@@ -46,7 +46,7 @@ RTC_Error_e RTC_Init(RTC_Handle_t *rtcHandle) {
         WAIT_WITH_TIMEOUT(!(RCC->BDCR & (1 << RCC_BDCR_LSERDY_Pos)), RTC_ErrTimeout, RTC_TIMEOUT_MS);
     } else if (rtcHandle->Config.ClockSource == RTC_ClkHSE) {
         // Configure RTC HSE prescaler
-        if (rtcHandle->Config.HSEPrescaler < RTC_MIN_HSE_PRESC || rtcHandle->Config.HSEPrescaler > RTC_MAX_HSE_PRESC) return RCC_ErrInvalidHSEPresc;
+        if (rtcHandle->Config.HSEPrescaler < RTC_MIN_HSE_PRESC || rtcHandle->Config.HSEPrescaler > RTC_MAX_HSE_PRESC) return RTC_ErrInvalidHSEPresc;
         RCC->CFGR |= (rtcHandle->Config.HSEPrescaler << RCC_CFGR_RTCPRE_Pos);
     }
 
@@ -78,6 +78,115 @@ RTC_Error_e RTC_Init(RTC_Handle_t *rtcHandle) {
     exit_init_mode();
 
     return RTC_ErrOK;
+}
+
+/**
+ * @brief Configures the desired alarm
+ * @param AlarmConfig Configuration for the desired alarm
+ */
+RTC_Error_e RTC_ConfigureAlarm(RTC_Handle_t *rtcHandle, RTC_AlarmConfig_t AlarmConfig) {
+    uint32_t alarmRegister = 0x00;
+    uint32_t alarmSubSecondRegister = 0x00;
+
+    // Set date, hour, minutes, seconds and subseconds
+    if (!AlarmConfig.SecondsDisabled) {
+        VALIDATE_DATE_VALUE(AlarmConfig.Seconds, 0, 60, RTC_ErrInvalidSeconds);
+        alarmRegister = dec_to_bcd(AlarmConfig.Seconds);
+    } else alarmRegister = (1 << RTC_ALRMAR_MSK1_Pos);
+
+    if (!AlarmConfig.MinutesDisabled) {
+        VALIDATE_DATE_VALUE(AlarmConfig.Minutes, 0, 60, RTC_ErrInvalidMinutes);
+        alarmRegister |= (dec_to_bcd(AlarmConfig.Minutes) << RTC_ALRMAR_MNU_Pos);
+    } else alarmRegister = (1 << RTC_ALRMAR_MSK2_Pos);
+
+    if (!AlarmConfig.HoursDisabled) {
+        VALIDATE_DATE_VALUE(AlarmConfig.Hours, 0, rtcHandle->Config.HourFormat == RTC_HourFormat24 ? 24 : 12, RTC_ErrInvalidHours);
+        alarmRegister |= (dec_to_bcd(AlarmConfig.Hours) << RTC_ALRMAR_HU_Pos);
+    } else alarmRegister = (1 << RTC_ALRMAR_MSK3_Pos);
+
+    if (!AlarmConfig.DateDisabled) {
+        if (AlarmConfig.DateIsWeekday) {
+            VALIDATE_DATE_VALUE(AlarmConfig.Date, RTC_Monday, RTC_Sunday, RTC_ErrInvalidWeekday);
+        } else {
+            VALIDATE_DATE_VALUE(AlarmConfig.Date, 0, 31, RTC_ErrInvalidDay);
+        };
+
+        alarmRegister |= (dec_to_bcd(AlarmConfig.DateIsWeekday) << RTC_ALRMAR_WDSEL_Pos);
+        alarmRegister |= (dec_to_bcd(AlarmConfig.Date) << RTC_ALRMAR_DU_Pos);
+    } else {
+        alarmRegister = (1 << RTC_ALRMAR_MSK4_Pos);
+    }
+
+    if (AlarmConfig.SubsSecondsMask != RTC_SubsecondsMaskDisabled) {
+        alarmSubSecondRegister = (AlarmConfig.SubSeconds & 0x3FFF) | (AlarmConfig.SubsSecondsMask << RTC_ALRMASSR_MASKSS_Pos);
+    }
+
+    // Set hour notation
+    alarmRegister |= (AlarmConfig.Notation << RTC_ALRMAR_PM_Pos);
+
+    // Write to registers
+    if (AlarmConfig.AlarmX == RTC_AlarmA) {
+        RTC->ALRMAR = alarmRegister;
+        RTC->ALRMASSR = alarmSubSecondRegister;
+    }
+    else {
+        RTC->ALRMBR = alarmRegister;
+        RTC->ALRMBSSR = alarmSubSecondRegister;
+    }
+
+    return RTC_ErrOK;
+}
+
+/**
+ * @brief Enables and disables the desired alarm
+ * @param Alarm Desired alarm
+ * @param Enabled If the alarm should be enabled
+ */
+void RTC_AlarmControl(RTC_Alarm_e Alarm, uint8_t Enabled) {
+    if (Enabled) {
+        if (Alarm == RTC_AlarmA) RTC->CR |= (1 << RTC_CR_ALRAE_Pos);
+        else RTC->CR |= (1 << RTC_CR_ALRBE_Pos);
+    } else {
+        if (Alarm == RTC_AlarmA) RTC->CR &=~ (1 << RTC_CR_ALRAE_Pos);
+        else RTC->CR &=~ (1 << RTC_CR_ALRBE_Pos);
+    }
+}
+
+RTC_Error_e RTC_ConfigureWakeUpTimer(RTC_WakeUpTimerConfig_t Config) {
+    if (Config.AutoReloadValue < 0x00 || Config.AutoReloadValue > 0xFFFF) return RTC_ErrInvalidWKUPAutoRealoadValue
+    if (RTC->CR & (1 << RTC_CR_WUTE_Pos)) return RTC_ErrWKUPEnabled;
+
+    // Wake-Up timer clock source
+    RTC->CR |= (Config.ClockSource << RTC_CR_WUCKSEL_Pos);
+
+    // Auto-reload value
+    RTC->WUTR = Config.AutoReloadValue;
+
+    return RTC_ErrOK;
+}
+
+/**
+ * @brief Enables or disables the wake-up timer
+ * @param Enabled If the wake-up timer should be enabled
+ */
+void RTC_WakeUpTimerControl(uint8_t Enabled) {
+    if (Enabled) {
+        RTC->CR |= (1 << RTC_CR_WUTE_Pos);
+    } else {
+        RTC->CR &=~ (1 << RTC_CR_WUTE_Pos);
+    }
+}
+
+/**
+ * @brief Configures the RTC for winter or summer time
+ */
+void RTC_ConfigureDayLightSaving() {
+    // TODO: Read the rtc and decide whether one hour should be added or subtracted
+    // if (AddHour) {
+        // RTC->CR |= (1 << RTC_CR_ADD1H_Pos);
+    // } else {
+        // RTC->CR |= (1 << RTC_CR_SUB1H_Pos);
+    // }
 }
 
 
