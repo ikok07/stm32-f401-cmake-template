@@ -142,6 +142,12 @@ void CLOCK_SelectPLLClock(CLOCK_PLLSrc_e CLOCK_Src);
 CLOCK_Error_e CLOCK_SetPLLFactors(uint32_t InDivFactor, uint32_t MultFactor, CLOCK_PLLSysClkPrescaler_e SysClkDivFactor);
 
 /*
+ * Reset
+ */
+void CLOCK_ResetSystem();
+void CLOCK_ResetBackupDomain();
+
+/*
  * Other methods
  */
 void CLOCK_SetSecuritySystem(uint8_t Enabled);

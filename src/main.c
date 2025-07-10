@@ -5,17 +5,11 @@
 #include <string.h>
 
 #include "gpio_driver.h"
-#include "adc_driver.h"
 #include "timer_driver.h"
+#include "rtc_driver.h"
 
-/*
- * ADC GPIOs: PA3, PA4 (ADC1_IN3, ADC1_IN4)
-*/
-
-#define LED_PIN             13
+#define RTC_AF1_PIN         13
 #define BTN_PIN             0
-#define ADC1_PIN            3
-#define ADC2_PIN            4
 #define TIM_PIN             8
 
 volatile uint8_t button_trigger = 0;
@@ -39,29 +33,11 @@ PWR_Handle_t pwrHandle = {
 GPIO_Handle_t gpioHandle = {
     .pGPIOx = GPIOC,
     .GPIO_PinConfig = {
-        .GPIO_PinNumber = LED_PIN,
+        .GPIO_PinNumber = RTC_AF1_PIN,
         .GPIO_PinMode = GPIO_ModeOutput,
         .GPIO_PinOPType = GPIO_OpTypePP,
         .GPIO_PinPuPdControl = GPIO_NoPuPd,
         .GPIO_PinSpeed = GPIO_SpeedHigh
-    }
-};
-
-ADC_Handle_t adcHandle = {
-    .Config = {
-        .Prescaler = ADC_Perscaler2,
-        .Resolution = ADC_Resolution12bit,
-        .DataAlignment = ADC_DataAlignRight,
-        .SamplingTimes = {0},
-        .ScanModeEnabled = ENABLE,
-        .AutoInjectedGroupConversion = DISABLE,
-        .ContinuousModeEnabled = DISABLE,
-        .SampledRegularChannelsSequence = {ADC_Channel3, ADC_Channel4},
-        .SampledRegularChannelsSequenceLength = 2,
-        .SampledInjectedChannelsSequenceLength = 0,
-        .DMAConfig = {
-            .Enabled = ENABLE
-        }
     }
 };
 
@@ -72,6 +48,25 @@ TIM_Handle_t timHandle = {
         .UpdateEventToggle = TIM_UpdateEventEnabled,
         .UpdateRequestSourceMode = TIM_UpdateReqSrcMode1,
         .PreloadEnabled = ENABLE
+    }
+};
+
+RTC_Handle_t rtcHandle = {
+    .Config = {
+        .ClockSource = RTC_ClkLSE,
+        .HourFormat = RTC_HourFormat24,
+        .AsyncPrescaler = 127,
+        .SyncPrescaler = 255,
+        .StartDate = {
+            .Day = 10,
+            .Month = 7,
+            .Year = 25,
+            .Hours = 16,
+            .Minutes = 0,
+            .Seconds = 0,
+            .Notation = RTC_NotationAM_24H,
+            .Weekday = RTC_Thursday
+        }
     }
 };
 
@@ -92,26 +87,21 @@ int main(void) {
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
-    // Init ADC GPIOs
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = ADC1_PIN;
-    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl =  GPIO_NoPuPd;
-    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAnalog;
-    GPIO_Init(&gpioHandle);
-
-    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = ADC2_PIN;
-    GPIO_Init(&gpioHandle);
-
     // Start SysTick
     Generic_InitSysTick();
-
-    // Init ADC
-    ADC_PeriClockControl(ENABLE);
-    ADC_Error_e err = ADC_Init(&adcHandle);
-    ADC_PeripheralControl(ENABLE);
 
     // Init TIM1
     TIM_PeriClockControl(timHandle.pTIMx, ENABLE);
     TIM_Init(&timHandle);
+
+    // Init RTC
+    CLOCK_ResetBackupDomain();
+    RTC_ClockControl(ENABLE);
+    RTC_Error_e err = RTC_Init(&rtcHandle);
+    (void)err;
+    Generic_Delay(5000);
+    RTC_CalendarDate_t date;
+    RTC_ReadCalendar(&rtcHandle, &date);
 
     TIM_OutputCompareConfig_t outputCompareConfig = {
         .Mode = TIM_OutputCompareMode4,
@@ -149,14 +139,11 @@ int main(void) {
             // Stop SysTick
             SYSTICK_CounterControl(DISABLE);
 
-            GPIO_ToggleOutputPin(GPIOC, LED_PIN);
             PWR_EnterSleepMode(&pwrHandle);
-            GPIO_ToggleOutputPin(GPIOC, LED_PIN);
 
             // Start SysTick
             SYSTICK_CounterControl(DISABLE);
 
-            (void)err;
             button_trigger = 0;
         }
     };

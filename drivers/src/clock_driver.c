@@ -159,6 +159,21 @@ CLOCK_Error_e CLOCK_SetPLLFactors(uint32_t InDivFactor, uint32_t MultFactor, CLO
 }
 
 /**
+ * @brief Resets the CPU and the Peripherals
+ */
+void CLOCK_ResetSystem() {
+    NVIC_SystemReset();
+}
+
+/**
+ * @brief Resets RTC registers, LSE oscillator configuration and the RCC_BDCR
+ */
+void CLOCK_ResetBackupDomain() {
+    RCC->BDCR |= (1 << RCC_BDCR_BDRST_Pos);
+    RCC->BDCR &=~ (1 << RCC_BDCR_BDRST_Pos);
+}
+
+/**
  * @brief Enables / Disables the clock security system (CSS)
  * @param Enabled If it should be enabled
  */
