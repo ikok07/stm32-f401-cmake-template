@@ -135,7 +135,7 @@ int main(void) {
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
 
             // Start SysTick
-            SYSTICK_CounterControl(DISABLE);
+            SYSTICK_CounterControl(ENABLE);
 
             (void)err;
             button_trigger = 0;

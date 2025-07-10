@@ -2,8 +2,14 @@
 // Created by Kok on 7/8/25.
 //
 
-#include "power_driver.h"
 #include "stm32f4xx.h"
+
+#include <commons.h>
+#include <systick_driver.h>
+
+#include "power_driver.h"
+
+#include <rtc_driver.h>
 
 /**
  * @brief Controls the power registers clock
@@ -51,6 +57,9 @@ PWR_Error_e PWR_Init(PWR_Handle_t *pwrHandle) {
 
     // Backup regulator
     PWR->CSR |= (pwrHandle->Config.BackupRegulatorEnabled << PWR_CSR_BRE_Pos);
+    if (pwrHandle->Config.BackupRegulatorEnabled) {
+        WAIT_WITH_TIMEOUT(!(PWR->CSR & (1 << PWR_CSR_BRR_Pos)), PWR_ErrTimeout, PWR_TIMEOUT_MS);
+    }
 
     // Wake up pin
     PWR->CSR |= (pwrHandle->Config.WakeUpConfig.WKUPPinEnabled << PWR_CSR_EWUP_Pos);
@@ -89,6 +98,16 @@ void PWR_EnterDeepSleepMode(PWR_Handle_t *pwrHandle) {
 
     // Enable deep sleep
     SCB->SCR |= (1 << SCB_SCR_SLEEPDEEP_Pos);
+
+    // Clear all EXTI pending bits
+    EXTI->PR = 0xFFFFFFFF;
+
+    // Clear RTC flags
+    RTC_ClearFlag(RTC_FlagAlarmA);
+    RTC_ClearFlag(RTC_FlagAlarmB);
+    RTC_ClearFlag(RTC_FlagWKUPTimer);
+    RTC_ClearFlag(RTC_FlagTamper);
+    RTC_ClearFlag(RTC_FlagTimestamp);
 
     // Enter deep sleep
     if (pwrHandle->Config.WakeUpConfig.Source == PWR_WakeUpSrcInterrupt) {

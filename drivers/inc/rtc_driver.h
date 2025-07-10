@@ -15,15 +15,25 @@
 
 #define VALIDATE_DATE_VALUE(value, min, max, err)       if (value < min || value > max) return err;
 
-#define RTC_IT_ALARM_A                  RTC_CR_ALRAIE_Pos
-#define RTC_IT_ALARM_B                  RTC_CR_ALRBIE_Pos
-#define RTC_IT_WKUP                     RTC_CR_WUTIE_Pos
-#define RTC_IT_TIMESTAMP                RTC_CR_TSIE_Pos
-#define RTC_IT_TAMPER                   RTC_TAFCR_TAMP1E_Pos
+#define RTC_IT_ALARM_A                  0b00001
+#define RTC_IT_ALARM_B                  0b00010
+#define RTC_IT_WKUP                     0b00100
+#define RTC_IT_TIMESTAMP                0b01000
+#define RTC_IT_TAMPER                   0b10000
+
+#define RTC_IT_ALARM_A_POS              0x00
+#define RTC_IT_ALARM_B_POS              0x01
+#define RTC_IT_WKUP_POS                 0x02
+#define RTC_IT_TIMESTAMP_POS            0x03
+#define RTC_IT_TAMPER_POS               0x04
 
 #define RTC_IRQ_GROUP_ALARMS            0b001
 #define RTC_IRQ_GROUP_WKUP              0b010
 #define RTC_IRQ_GROUP_TS_TAMP           0b100
+
+#define RTC_IRQ_GROUP_ALARMS_POS        0x00
+#define RTC_IRQ_GROUP_WKUP_POS          0x01
+#define RTC_IRQ_GROUP_TS_TAMP_POS            0x02
 
 /* ------------ ERROR CODES ------------ */
 

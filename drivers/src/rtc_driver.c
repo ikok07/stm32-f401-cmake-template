@@ -156,17 +156,17 @@ RTC_Error_e RTC_ConfigureAlarm(RTC_Handle_t *pRTCHandle, RTC_AlarmConfig_t Alarm
     if (!AlarmConfig.SecondsDisabled) {
         VALIDATE_DATE_VALUE(AlarmConfig.Seconds, 0, 60, RTC_ErrInvalidSeconds);
         alarmRegister = dec_to_bcd(AlarmConfig.Seconds);
-    } else alarmRegister = (1 << RTC_ALRMAR_MSK1_Pos);
+    } else alarmRegister |= (1 << RTC_ALRMAR_MSK1_Pos);
 
     if (!AlarmConfig.MinutesDisabled) {
         VALIDATE_DATE_VALUE(AlarmConfig.Minutes, 0, 60, RTC_ErrInvalidMinutes);
         alarmRegister |= (dec_to_bcd(AlarmConfig.Minutes) << RTC_ALRMAR_MNU_Pos);
-    } else alarmRegister = (1 << RTC_ALRMAR_MSK2_Pos);
+    } else alarmRegister |= (1 << RTC_ALRMAR_MSK2_Pos);
 
     if (!AlarmConfig.HoursDisabled) {
         VALIDATE_DATE_VALUE(AlarmConfig.Hours, 0, (pRTCHandle->Config.HourFormat == RTC_HourFormat24 ? 24 : 12), RTC_ErrInvalidHours);
         alarmRegister |= (dec_to_bcd(AlarmConfig.Hours) << RTC_ALRMAR_HU_Pos);
-    } else alarmRegister = (1 << RTC_ALRMAR_MSK3_Pos);
+    } else alarmRegister |= (1 << RTC_ALRMAR_MSK3_Pos);
 
     if (!AlarmConfig.DateDisabled) {
         if (AlarmConfig.DateIsWeekday) {
@@ -178,7 +178,7 @@ RTC_Error_e RTC_ConfigureAlarm(RTC_Handle_t *pRTCHandle, RTC_AlarmConfig_t Alarm
         alarmRegister |= (dec_to_bcd(AlarmConfig.DateIsWeekday) << RTC_ALRMAR_WDSEL_Pos);
         alarmRegister |= (dec_to_bcd(AlarmConfig.Date) << RTC_ALRMAR_DU_Pos);
     } else {
-        alarmRegister = (1 << RTC_ALRMAR_MSK4_Pos);
+        alarmRegister |= (1 << RTC_ALRMAR_MSK4_Pos);
     }
 
     if (AlarmConfig.SubsSecondsMask != RTC_SubsecondsMaskDisabled) {
@@ -391,17 +391,17 @@ void RTC_ClearFlag(RTC_Flag_e Flag) {
  */
 void RTC_EnableInterrupts(uint8_t InterruptsMask) {
     /* ***** Alarm A and B ***** */
-    if (InterruptsMask & (1 << RTC_IT_ALARM_A) || InterruptsMask & (1 << RTC_IT_ALARM_B)) {
+    if (InterruptsMask & (1 << RTC_IT_ALARM_A_POS) || InterruptsMask & (1 << RTC_IT_ALARM_B_POS)) {
         // Enable EXTI 17
         EXTI->IMR |= (1 << EXTI_IMR_MR17_Pos);
         EXTI->RTSR |= (1 << EXTI_RTSR_TR17_Pos);
     }
 
-    if (InterruptsMask & (1 << RTC_IT_ALARM_A)) RTC->CR |= (1 << RTC_CR_ALRAIE_Pos);
-    if (InterruptsMask & (1 << RTC_IT_ALARM_B)) RTC->CR |= (1 << RTC_CR_ALRBIE_Pos);
+    if (InterruptsMask & (1 << RTC_IT_ALARM_A_POS)) RTC->CR |= (1 << RTC_CR_ALRAIE_Pos);
+    if (InterruptsMask & (1 << RTC_IT_ALARM_B_POS)) RTC->CR |= (1 << RTC_CR_ALRBIE_Pos);
 
     /* ***** Wake-up ***** */
-    if (InterruptsMask & (1 << RTC_IT_WKUP)) {
+    if (InterruptsMask & (1 << RTC_IT_WKUP_POS)) {
         // Enable EXTI 22
         EXTI->IMR |= (1 << EXTI_IMR_MR22_Pos);
         EXTI->RTSR |= (1 << EXTI_RTSR_TR22_Pos);
@@ -410,14 +410,14 @@ void RTC_EnableInterrupts(uint8_t InterruptsMask) {
     }
 
     /* ***** Tamper detection and timestamp ***** */
-    if (InterruptsMask & (1 << RTC_IT_TAMPER) || InterruptsMask & (1 << RTC_IT_TIMESTAMP)) {
+    if (InterruptsMask & (1 << RTC_IT_TAMPER_POS) || InterruptsMask & (1 << RTC_IT_TIMESTAMP_POS)) {
         // Enable EXTI 21
         EXTI->IMR |= (1 << EXTI_IMR_MR21_Pos);
         EXTI->RTSR |= (1 << EXTI_RTSR_TR21_Pos);
     }
 
-    if (InterruptsMask & (1 << RTC_IT_TAMPER)) RTC->TAFCR |= (1 << RTC_TAFCR_TAMP1E_Pos);
-    if (InterruptsMask & (1 << RTC_IT_TIMESTAMP)) RTC->CR |= (1 << RTC_CR_TSIE_Pos);
+    if (InterruptsMask & (1 << RTC_IT_TAMPER_POS)) RTC->TAFCR |= (1 << RTC_TAFCR_TAMP1E_Pos);
+    if (InterruptsMask & (1 << RTC_IT_TIMESTAMP_POS)) RTC->CR |= (1 << RTC_CR_TSIE_Pos);
 }
 
 /**
@@ -426,16 +426,16 @@ void RTC_EnableInterrupts(uint8_t InterruptsMask) {
  */
 void RTC_DisableInterrupts(uint8_t InterruptsMask) {
     /* ***** Alarm A and B ***** */
-    if (InterruptsMask & (1 << RTC_IT_ALARM_A)) RTC->CR &=~ (1 << RTC_CR_ALRAIE_Pos);
-    if (InterruptsMask & (1 << RTC_IT_ALARM_B)) RTC->CR &=~ (1 << RTC_CR_ALRBIE_Pos);
+    if (InterruptsMask & (1 << RTC_IT_ALARM_A_POS)) RTC->CR &=~ (1 << RTC_CR_ALRAIE_Pos);
+    if (InterruptsMask & (1 << RTC_IT_ALARM_B_POS)) RTC->CR &=~ (1 << RTC_CR_ALRBIE_Pos);
 
-    if (!(InterruptsMask & (1 << RTC_IT_ALARM_A)) && !(InterruptsMask & (1 << RTC_IT_ALARM_B))) {
+    if (!(InterruptsMask & (1 << RTC_IT_ALARM_A_POS)) && !(InterruptsMask & (1 << RTC_IT_ALARM_B_POS))) {
         // Disable EXTI 17
         EXTI->IMR &=~ (1 << EXTI_IMR_MR17_Pos);
     }
 
     /* ***** Wake-up ***** */
-    if (InterruptsMask & (1 << RTC_IT_WKUP)) {
+    if (InterruptsMask & (1 << RTC_IT_WKUP_POS)) {
         // Disable EXTI22
         EXTI->IMR &=~ (1 << EXTI_IMR_MR22_Pos);
 
@@ -443,10 +443,10 @@ void RTC_DisableInterrupts(uint8_t InterruptsMask) {
     }
 
     /* ***** Tamper detection and timestamp ***** */
-    if (InterruptsMask & (1 << RTC_IT_TAMPER)) RTC->TAFCR &=~ (1 << RTC_TAFCR_TAMP1E_Pos);
-    if (InterruptsMask & (1 << RTC_IT_TIMESTAMP)) RTC->CR &=~ (1 << RTC_CR_TSIE_Pos);
+    if (InterruptsMask & (1 << RTC_IT_TAMPER_POS)) RTC->TAFCR &=~ (1 << RTC_TAFCR_TAMP1E_Pos);
+    if (InterruptsMask & (1 << RTC_IT_TIMESTAMP_POS)) RTC->CR &=~ (1 << RTC_CR_TSIE_Pos);
 
-    if (!(InterruptsMask & (1 << RTC_IT_TAMPER)) && !(InterruptsMask & (1 << RTC_IT_TIMESTAMP))) {
+    if (!(InterruptsMask & (1 << RTC_IT_TAMPER_POS)) && !(InterruptsMask & (1 << RTC_IT_TIMESTAMP_POS))) {
         // Disable EXTI 21
         EXTI->IMR &=~ (1 << EXTI_IMR_MR21_Pos);
     }
@@ -458,13 +458,17 @@ void RTC_DisableInterrupts(uint8_t InterruptsMask) {
  * @param Priority The desired IRQ priority
  */
 void RTC_IQREnable(uint8_t IRQGroupsMask, uint8_t Priority) {
-    if (IRQGroupsMask & (1 << RTC_IRQ_GROUP_ALARMS)) {
+    if (IRQGroupsMask & (1 << RTC_IRQ_GROUP_ALARMS_POS)) {
         NVIC_EnableIRQ(RTC_Alarm_IRQn);
         NVIC_SetPriority(RTC_Alarm_IRQn, Priority);
-    } else if (IRQGroupsMask & (1 << RTC_IRQ_GROUP_WKUP)) {
+    }
+
+    if (IRQGroupsMask & (1 << RTC_IRQ_GROUP_WKUP_POS)) {
         NVIC_EnableIRQ(RTC_WKUP_IRQn);
         NVIC_SetPriority(RTC_WKUP_IRQn, Priority);
-    } else if (IRQGroupsMask & (1 << RTC_IRQ_GROUP_TS_TAMP)) {
+    }
+
+    if (IRQGroupsMask & (1 << RTC_IRQ_GROUP_TS_TAMP_POS)) {
         NVIC_EnableIRQ(TAMP_STAMP_IRQn);
         NVIC_SetPriority(TAMP_STAMP_IRQn, Priority);
     }
@@ -488,30 +492,36 @@ void RTC_IRQHandling(RTC_Handle_t *pRTCHandle) {
     if (RTC->CR & (1 << RTC_CR_ALRAIE_Pos) && RTC->ISR & (1 << RTC_ISR_ALRAF_Pos)) {
         // Alarm A
         RTC->ISR &=~ (1 << RTC_ISR_ALRAF_Pos);
+        EXTI->PR |= (1 << EXTI_PR_PR17_Pos);
         RTC_ApplicationEventCallback(pRTCHandle, RTC_EventAlarmA);
     }
 
     if (RTC->CR & (1 << RTC_CR_ALRBIE_Pos) && RTC->ISR & (1 << RTC_ISR_ALRBF_Pos)) {
         // Alarm B
         RTC->ISR &=~ (1 << RTC_ISR_ALRBF_Pos);
+        EXTI->PR |= (1 << EXTI_PR_PR17_Pos);
+
         RTC_ApplicationEventCallback(pRTCHandle, RTC_EventAlarmB);
     }
 
     if (RTC->CR & (1 << RTC_CR_WUTIE_Pos) && RTC->ISR & (1 << RTC_ISR_WUTF_Pos)) {
         // Wake-up
         RTC->ISR &=~ (1 << RTC_ISR_WUTF_Pos);
+        EXTI->PR |= (1 << EXTI_PR_PR22_Pos);
         RTC_ApplicationEventCallback(pRTCHandle, RTC_EventWakeUp);
     }
 
     if (RTC->CR & (1 << RTC_CR_TSIE_Pos) && RTC->ISR & (1 << RTC_ISR_TSF_Pos)) {
         // Timestamp
         RTC->ISR &=~ (1 << RTC_ISR_TSF_Pos);
+        EXTI->PR |= (1 << EXTI_PR_PR21_Pos);
         RTC_ApplicationEventCallback(pRTCHandle, RTC_EventTimestamp);
     }
 
     if (RTC->TAFCR & (1 << RTC_TAFCR_TAMPIE_Pos) && RTC->ISR & (1 << RTC_ISR_TAMP1F_Pos)) {
         // Tamper 1
         RTC->ISR &=~ (1 << RTC_ISR_TAMP1F_Pos);
+        EXTI->PR |= (1 << EXTI_PR_PR21_Pos);
         RTC_ApplicationEventCallback(pRTCHandle, RTC_EventTamperDetection);
     }
 }

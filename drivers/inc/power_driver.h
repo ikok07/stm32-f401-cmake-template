@@ -9,10 +9,13 @@
 
 /* ------------ MACROS ------------ */
 
+#define PWR_TIMEOUT_MS              3000
+
 /* ------------ ERROR CODES ------------ */
 
 typedef enum {
     PWR_ErrOK,
+    PWR_ErrTimeout,
     PWR_ErrBackupRegLocked
 } PWR_Error_e;
 
