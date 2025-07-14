@@ -132,7 +132,7 @@ void CLOCK_Disable(CLOCK_Src_e CLOCK_Src);
  * Clock selection and bus config
  */
 void CLOCK_SelectSysClock(CLOCK_SysClockSrc_e CLOCK_Src);
-void CLOCK_SetAHBBusPrescaler(CLOCK_APBPrescaler_e Prescaler);
+void CLOCK_SetAHBBusPrescaler(CLOCK_AHBPrescaler_e Prescaler);
 void CLOCK_SetAPBBusPrescaler(CLOCK_APBBus_e CLOCK_APBBus, CLOCK_APBPrescaler_e Prescaler);
 
 /*

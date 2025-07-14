@@ -56,7 +56,7 @@ BME280_Handle_t bme280Handle = {
         .PressureOversampling = BME280_Oversampling1,
         .TemperatureOversampling = BME280_Oversampling1,
         .HumidityOversampling = BME280_Oversampling1,
-        .NormalModeStanbyDuration = BME280_StandbyDuration100
+        .NormalModeStandbyDuration = BME280_StandbyDuration100
     }
 };
 

@@ -45,27 +45,25 @@ set (RUNTIME_LIBRARY          "--specs=nano.specs")
 set (RUNTIME_LIBRARY_SYSCALLS "--specs=nosys.specs")
 
 
+file(GLOB_RECURSE APP_SOURCES
+		"src/*.c"
+		"src/*.s"
+		"startup_stm32f401ccux.s"
+)
+
+file(GLOB_RECURSE UTILS_SOURCES
+		"utils/src/*.c"
+)
+
+file(GLOB_RECURSE DRIVER_SOURCES
+		"drivers/src/*.c"
+)
+
 set (PROJECT_SOURCES
-	# LIST SOURCE FILES HERE
-	startup_stm32f401ccux.s
-	src/main.c
-	src/syscalls.c
-	src/sysmem.c
-	utils/src/generic_methods.c
-	drivers/src/gpio_driver.c
-	drivers/src/spi_driver.c
-	drivers/src/i2c_driver.c
-	drivers/src/bme280_i2c_driver.c
-	drivers/src/usart_driver.c
-	drivers/src/clock_driver.c
-	drivers/src/flash_driver.c
-	drivers/src/timer_driver.c
-	drivers/src/systick_driver.c
-	drivers/src/ssd1306_i2c_driver.c
-	drivers/src/adc_driver.c
-	drivers/src/dma_driver.c
-	drivers/src/power_driver.c
-	drivers/src/rtc_driver.c
+		# LIST SOURCE FILES HERE
+		${APP_SOURCES}
+		${UTILS_SOURCES}
+		${DRIVER_SOURCES}
 )
 
 set (PROJECT_DEFINES

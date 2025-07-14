@@ -339,7 +339,7 @@ void I2C_SlaveReceiveDataIT(I2C_Handle_t *pI2CHandle, uint8_t *pRXBuffer) {
  * @return If the peripheral is enabled
  */
 uint8_t I2C_PeripheralEnabled(I2C_TypeDef *pI2Cx) {
-    return (pI2Cx->CR1 & (1 << I2C_CR1_PE)) > 0;
+    return (pI2Cx->CR1 & (1 << I2C_CR1_PE_Pos)) > 0;
 }
 
 /**

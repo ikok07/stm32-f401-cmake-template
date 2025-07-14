@@ -45,7 +45,7 @@ BME280_Error_t BME280_Configure(BME280_Handle_t *pBME280Handle) {
     configReg |= (pBME280Handle->BME280_Config.FilterCoeff << BME280_CONFIG_FILTER_POS);
 
     // Standby duration
-    configReg |= (pBME280Handle->BME280_Config.NormalModeStanbyDuration << BME280_CONFIG_TSB_POS);
+    configReg |= (pBME280Handle->BME280_Config.NormalModeStandbyDuration << BME280_CONFIG_TSB_POS);
 
     // Pressure oversampling
     measReg |= (pBME280Handle->BME280_Config.PressureOversampling << BME280_CTRL_MEAS_OSRSP_POS);

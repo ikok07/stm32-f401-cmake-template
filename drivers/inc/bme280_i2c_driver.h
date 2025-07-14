@@ -106,7 +106,7 @@ typedef struct {
     BME280_Oversampling_e PressureOversampling;
     BME280_Oversampling_e HumidityOversampling;
     BME280_Oversampling_e TemperatureOversampling;
-    BME280_StandbyDuration_e NormalModeStanbyDuration;
+    BME280_StandbyDuration_e NormalModeStandbyDuration;
 } BME280_Config_t;
 
 typedef struct {

@@ -172,10 +172,10 @@ typedef enum {
 } ADC_SamplingTime_e;
 
 typedef enum {
-    ADC_Perscaler2,
-    ADC_Perscaler4,
-    ADC_Perscaler6,
-    ADC_Perscaler8,
+    ADC_Prescaler2,
+    ADC_Prescaler4,
+    ADC_Prescaler6,
+    ADC_Prescaler8,
 } ADC_Prescaler_e;
 
 typedef enum {

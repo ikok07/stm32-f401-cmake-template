@@ -1,40 +1,40 @@
+//
+// Created by Kok on 7/4/25.
+//
 
-#include <clock_driver.h>
 #include <generic_methods.h>
-#include <power_driver.h>
+#include <i2c_driver.h>
+#include <ssd1306_i2c_driver.h>
+#include <stdio.h>
 #include <string.h>
 
+#include "stm32f4xx.h"
 #include "gpio_driver.h"
-#include "timer_driver.h"
-#include "rtc_driver.h"
 
-#define RTC_AF1_PIN         13
+/*
+ * DISPLAY GPIO:
+ * PWR      => PB6
+ * I2C GPIOs:
+ * SDA      =>  PB7
+ * SCL      =>  PB8
+*/
+
+#define LED_PIN             13
 #define BTN_PIN             0
-#define TIM_PIN             8
+
+#define DISPLAY_PWR         6
+
+#define I2C_SDA             7
+#define I2C_SCL             8
+
 
 volatile uint8_t button_trigger = 0;
-uint16_t adcBuffer[2];
-
-PWR_Handle_t pwrHandle = {
-    .Config = {
-        .BackupRegulatorEnabled = ENABLE,
-        .RegulatorVoltageScaling = PWR_RegulatorScale2,
-        .PVDEnabled = DISABLE,
-        .LowPowerRegulatorInStopMode = ENABLE,
-        .LowPowerRegulatorLowVoltageEnabled = ENABLE,
-        .StandbyModeInDeepSleepEnabled = ENABLE,           // Stop or Standby Mode
-        .FlashPowerDownInStopMode = ENABLE,
-        .WakeUpConfig = {
-            .Source = PWR_WakeUpSrcInterrupt,
-            .WKUPPinEnabled = DISABLE        // PA0
-        }
-    }
-};
+uint8_t counter = 0;
 
 GPIO_Handle_t gpioHandle = {
     .pGPIOx = GPIOC,
     .GPIO_PinConfig = {
-        .GPIO_PinNumber = RTC_AF1_PIN,
+        .GPIO_PinNumber = LED_PIN,
         .GPIO_PinMode = GPIO_ModeOutput,
         .GPIO_PinOPType = GPIO_OpTypePP,
         .GPIO_PinPuPdControl = GPIO_NoPuPd,
@@ -42,36 +42,43 @@ GPIO_Handle_t gpioHandle = {
     }
 };
 
-RTC_Handle_t rtcHandle = {
-    .Config = {
-        .ClockSource = RTC_ClkLSE,
-        .HourFormat = RTC_HourFormat24,
-        .AsyncPrescaler = 127,
-        .SyncPrescaler = 255,
-        .StartDate = {
-            .Day = 10,
-            .Month = 7,
-            .Year = 25,
-            .Hours = 16,
-            .Minutes = 0,
-            .Seconds = 0,
-            .Notation = RTC_NotationAM_24H,
-            .Weekday = RTC_Thursday
-        }
+I2C_Handle_t i2cHandle = {
+    .pI2Cx = I2C1,
+    .I2C_Config = {
+        .I2C_DeviceAddress = I2C_DeviceAddr7Bits,
+        .I2C_FMDutyCycle = I2C_FmDuty2,
+        .I2C_SCLSpeed = I2C_SclSpeedFM4K
     }
 };
 
+uint8_t tempImg[] = {
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xE7, 0x81, 0x98, 0x3C, 0x3C, 0x98, 0x81, 0xE7, 0xFF, 0xFF, 0xFF, 0xFF
+};
+
+uint8_t sunImg[] = {
+    0x10, 0x54, 0x38, 0x28, 0x62, 0x9f, 0x9f, 0x60
+};
+
+uint8_t desktopImg[] = {
+    0x00, 0xfc, 0x04, 0x24, 0x24, 0x04, 0x24, 0x04, 0x04, 0x24, 0x04, 0x04, 0x04, 0x04, 0xfc, 0x00,
+    0x00, 0x3f, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x3f, 0x00
+};
+
+uint8_t squareImg[] = {
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+};
+
+uint8_t testImg[] = {
+    0x00, 0x38, 0x7C, 0x44, 0x44, 0x7C, 0x38, 0x00,
+    0x00, 0x10, 0x00, 0x20, 0x00, 0x10, 0x00, 0x20
+};
+
 int main(void) {
-    // Start SysTick
     Generic_InitSysTick();
 
-    // Configure power options
-    PWR_PeriClockControl(ENABLE);
-    PWR_UnlockBackupRegisters();
-    PWR_Error_e pwrErr = PWR_Init(&pwrHandle);
-    (void)pwrErr;
-
-    // Init the RTC AF1 Pin
+    // Init the LED
     GPIO_Init(&gpioHandle);
 
     // Init the BTN
@@ -82,58 +89,86 @@ int main(void) {
     GPIO_Init(&gpioHandle);
     GPIO_IRQConfig(BTN_PIN, 1, ENABLE);
 
-    // Init RTC
-    RTC_Error_e err;
-    // if (!RTC_IsCalendarInitialized()) {
-        CLOCK_ResetBackupDomain();
-        RTC_ClockControl(ENABLE);
-        err = RTC_Init(&rtcHandle);
-        (void)err;
-    // }
+    // Init display power pin
+    gpioHandle.pGPIOx = GPIOB;
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = DISPLAY_PWR;
+    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
+    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeOutput;
+    GPIO_Init(&gpioHandle);
 
-    RTC_AlarmConfig_t alarmConfig = {
-        .AlarmX = RTC_AlarmA,
-        // .Date = 10,
-        // .Hours = 16,
-        // .Minutes = 0,
-        .Seconds = 10,
-        .Notation = RTC_NotationAM_24H,
-        .DateDisabled = ENABLE,
-        .HoursDisabled = ENABLE,
-        .MinutesDisabled = ENABLE,
+    // Init I2C SCL
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SCL;
+    gpioHandle.GPIO_PinConfig.GPIO_PinMode = GPIO_ModeAlternate;
+    gpioHandle.GPIO_PinConfig.GPIO_PinPuPdControl = GPIO_NoPuPd;
+    gpioHandle.GPIO_PinConfig.GPIO_PinOPType = GPIO_OpTypeOD;
+    gpioHandle.GPIO_PinConfig.GPIO_PinAltFunMode = GPIO_AF4;
+    GPIO_Init(&gpioHandle);
+
+    // Init I2C SDA
+    gpioHandle.GPIO_PinConfig.GPIO_PinNumber = I2C_SDA;
+    GPIO_Init(&gpioHandle);
+
+    // Configure I2C
+    I2C_Error_e i2cError;
+    I2C_PeriClockControl(i2cHandle.pI2Cx, ENABLE);
+    if ((i2cError = I2C_Init(&i2cHandle)) != I2C_ErrOK) {
+        return SSD1306_ErrComm;
+    }
+    I2C_PeripheralControl(i2cHandle.pI2Cx, ENABLE);
+
+    // Setup the display
+    SSD1306_Handle_t display = {
+        .I2CHandle = &i2cHandle,
+        .PowerConfig = {
+            .pGPIOx = GPIOB,
+            .PinNumber = DISPLAY_PWR
+        }
     };
-    err = RTC_ConfigureAlarm(&rtcHandle, alarmConfig);
-    // RTC_SelectAlarmOutput(&rtcHandle, RTC_AlarmOutputWKUP, ENABLE, DISABLE);
 
-    RTC_WakeUpTimerConfig_t timerConfig = {
-        .ClockSource = RTC_WakeUpClockSPRE,
-        .AutoReloadValue = 1
+    SSD1306_Config_t displayConfig = {
+        .MUXRatio = 63,
+        .DisplayOffset = 0,
+        .DisplayStartLine = 0,
+        .SegmentsRemapped = DISABLE,
+        .COMScanRemapped = DISABLE,
+        .AlternativeCOMPinConfigEnabled = DISABLE,
+        .COMLeftRightRemapEnabled = DISABLE,
+        .Contrast = 255,
+        .DivideRatio = 0,
+        .OSCFreq = 0xF
     };
-    err = RTC_ConfigureWakeUpTimer(timerConfig);
 
-    RTC_EnableInterrupts(RTC_IT_ALARM_A | RTC_IT_WKUP);
-    RTC_IQREnable(RTC_IRQ_GROUP_ALARMS | RTC_IRQ_GROUP_WKUP, 1);
+    SSD1306_SetFont(&display, SSD1306_Font6x8);
+    SSD1306_Error_e displayErr = SSD1306_Init(&display, displayConfig);
+    displayErr = SSD1306_SetMemoryAddrMode(&display, SSD1306_MemAddrHorizontal);
+    displayErr = SSD1306_SetWriteAreaHV(&display, SSD1306_MIN_WIDTH, SSD1306_MAX_WIDTH, SSD1306_MIN_HEIGHT, SSD1306_MAX_HEIGHT);
+    displayErr = SSD1306_DisplayControl(&display, ENABLE);
+    displayErr = SSD1306_ClearAreaHV(&display);
+
+    if (displayErr) {
+        while (1) {
+            uint8_t test = 1;
+            (void) test;
+        }
+    }
 
     while (1) {
         if (button_trigger) {
-            // Small delay because of debouncing
-            for (int i = 0; i < 1000000; i++);
-
-            // Stop SysTick
-            SYSTICK_CounterControl(DISABLE);
-
-            // Enable alarm
-            // RTC_AlarmControl(RTC_AlarmA, ENABLE);
-
-            // Enable wake-up timer
-            RTC_WakeUpTimerControl(ENABLE);
-
-            PWR_EnterDeepSleepMode(&pwrHandle);
-
-            // Start SysTick
-            SYSTICK_CounterControl(ENABLE);
-
             button_trigger = 0;
+
+            Generic_Delay(1000);
+            GPIO_ToggleOutputPin(GPIOC, LED_PIN);
+            // SSD1306_ClearAreaHV(&display);
+            displayErr = SSD1306_SetWriteAreaHV(&display, SSD1306_MIN_WIDTH, SSD1306_MAX_WIDTH - 1, SSD1306_MIN_HEIGHT, SSD1306_MAX_HEIGHT);
+            displayErr = SSD1306_WriteHV(&display, 0, 0, "Hello, World ");
+
+            // char buffer[4];
+            // sprintf(buffer, "%d", counter);
+            // displayErr = SSD1306_WriteHV(&display, strlen("Hello, World ") * SSD1306_FONT_WIDTH, 0, buffer);
+
+            // displayErr = SSD1306_DrawHV(&display, 10, 10, 8, 8, sunImg, sizeof(sunImg));
+
+            counter++;
         }
     };
 }
@@ -141,14 +176,4 @@ int main(void) {
 void EXTI0_IRQHandler() {
     GPIO_IRQHandling(BTN_PIN);
     button_trigger = 1;
-}
-
-// Required for STOP mode
-void EXTI17_RTC_Alarm_IRQHandler() {
-    RTC_IRQHandling(&rtcHandle);
-}
-
-// Required for STOP mode
-void EXTI22_RTC_WKUP_IRQHandler() {
-    RTC_IRQHandling(&rtcHandle);
 }

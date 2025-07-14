@@ -110,7 +110,7 @@ void CLOCK_SelectSysClock(CLOCK_SysClockSrc_e CLOCK_Src) {
  * @brief Configures the AHB1 Bus prescaler
  * @param Prescaler The desired prescaler
  */
-void CLOCK_SetAHBBusPrescaler(CLOCK_APBPrescaler_e Prescaler) {
+void CLOCK_SetAHBBusPrescaler(CLOCK_AHBPrescaler_e Prescaler) {
     RCC->CFGR |= (Prescaler << RCC_CFGR_HPRE_Pos);
 }
 

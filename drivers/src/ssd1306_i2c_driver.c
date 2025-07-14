@@ -4,6 +4,8 @@
 
 #include "ssd1306_i2c_driver.h"
 
+#include <generic_methods.h>
+#include <gpio_driver.h>
 #include <string.h>
 #include "commons.h"
 
@@ -14,7 +16,7 @@ static SSD1306_Error_e send_commands(SSD1306_Handle_t *pSSD1306Handle, uint8_t *
 static SSD1306_Error_e send_data(SSD1306_Handle_t *pSSD1306Handle, uint8_t *data, uint32_t len);
 static void h_addr_set_pixel(uint8_t x, uint8_t y, uint8_t on);
 static void v_addr_set_pixel(uint8_t x, uint8_t y, uint8_t on);
-static uint8_t *get_char_bitmap(char c);
+static uint8_t *get_char_bitmap(SSD1306_Handle_t *pSSD1306Handle, char c);
 static void reset_state(SSD1306_Handle_t *pSSD1306Handle);
 
 #define SSD1306_SEND_COMMANDS(handle, err, ...)         do {                                                        \
@@ -22,7 +24,9 @@ static void reset_state(SSD1306_Handle_t *pSSD1306Handle);
                                                             err = send_commands(handle, cmds, sizeof(cmds));        \
                                                         } while (0)
 
-static uint8_t font6x8[96][6] = {
+/* ------ PAGE MODE FONTS ------ */
+
+static uint8_t font6x8PAGE[96][6] = {
     {0x00,0x00,0x00,0x00,0x00,0x00}, // ' '
     {0x00,0x00,0x5F,0x00,0x00,0x00}, // '!'
     {0x00,0x07,0x00,0x07,0x00,0x00}, // '"'
@@ -120,6 +124,18 @@ static uint8_t font6x8[96][6] = {
     {0x02,0x01,0x02,0x04,0x02,0x00}, // '~'
 };
 
+/* ------ HORIZONTAL MODE FONTS ------ */
+
+void SSD1306_SetFont(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Font_e Font) {
+    pSSD1306Handle->Font = Font;
+    switch (Font) {
+        case SSD1306_Font6x8:
+            pSSD1306Handle->FontWidth = 6;
+            pSSD1306Handle->FontHeight = 8;
+        break;
+    }
+}
+
 /**
  * @brief Sets the display cursor in PAGE ADDRESSING MODE
  * @param pSSD1306Handle Device handle
@@ -132,14 +148,14 @@ SSD1306_Error_e SSD1306_SetCursor(SSD1306_Handle_t *pSSD1306Handle, uint8_t Colu
 
     SSD1306_Error_e err = SSD1306_ErrOK;
 
-    // X Axis
-    uint8_t lowerNibble = Column & 0xF;
-    uint8_t higherNibble = (Column >> 4) & 0xF;
-    if ((err = SSD1306_SetPageModeColumnLowerNibble(pSSD1306Handle, lowerNibble)) != SSD1306_ErrOK) return err;
-    if ((err = SSD1306_SetPageModeColumnHigherNibble(pSSD1306Handle, higherNibble)) != SSD1306_ErrOK) return err;
-
     // Y Axis
     if ((err = SSD1306_SetPageModeStartPage(pSSD1306Handle, Page)) != SSD1306_ErrOK) return err;
+
+    // X Axis
+    uint8_t lowerNibble = Column & 0xF;
+    uint8_t higherNibble = 0x10 | ((Column >> 4) & 0xF);
+    if ((err = SSD1306_SetPageModeColumnLowerNibble(pSSD1306Handle, lowerNibble)) != SSD1306_ErrOK) return err;
+    if ((err = SSD1306_SetPageModeColumnHigherNibble(pSSD1306Handle, higherNibble)) != SSD1306_ErrOK) return err;
 
     return err;
 }
@@ -155,8 +171,8 @@ SSD1306_Error_e SSD1306_Write(SSD1306_Handle_t *pSSD1306Handle, char *str) {
     SSD1306_Error_e err = SSD1306_ErrOK;
 
     while (*str) {
-        uint8_t *fontChar = get_char_bitmap(*str++);
-        if ((err = send_data(pSSD1306Handle, fontChar, SSD1306_FONT_WIDTH)) != SSD1306_ErrOK) return err;
+        uint8_t *fontChar = get_char_bitmap(pSSD1306Handle, *str++);
+        if ((err = send_data(pSSD1306Handle, fontChar, pSSD1306Handle->FontWidth)) != SSD1306_ErrOK) return err;
     }
 
     return err;
@@ -175,8 +191,8 @@ SSD1306_Error_e SSD1306_Clear(SSD1306_Handle_t *pSSD1306Handle) {
 
     for (int i = 0; i <= SSD1306_MAX_PAGE_ADDR; i++) {
         if ((err = SSD1306_SetPageModeStartPage(pSSD1306Handle, i)) != SSD1306_ErrOK) return err;
-        if ((err = SSD1306_SetPageModeColumnLowerNibble(pSSD1306Handle, 0)) != SSD1306_ErrOK) return err;
-        if ((err = SSD1306_SetPageModeColumnHigherNibble(pSSD1306Handle, 0)) != SSD1306_ErrOK) return err;
+        if ((err = SSD1306_SetPageModeColumnLowerNibble(pSSD1306Handle, SSD1306_MIN_PAGE_LWR_COL_ADDR)) != SSD1306_ErrOK) return err;
+        if ((err = SSD1306_SetPageModeColumnHigherNibble(pSSD1306Handle, SSD1306_MIN_PAGE_HIGH_COL_ADDR)) != SSD1306_ErrOK) return err;
         if ((err = send_data(pSSD1306Handle, emptyLine, sizeof(emptyLine))) != SSD1306_ErrOK) return err;
     }
 
@@ -206,12 +222,22 @@ SSD1306_Error_e SSD1306_SetWriteAreaHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t
     uint8_t pageStart = yStart / 8;
     uint8_t pageEnd = yEnd / 8;
 
-    SSD1306_SetHVModeColumnAddr(pSSD1306Handle, xStart, xEnd);
-    SSD1306_SetHVModePageAddr(pSSD1306Handle, pageStart, pageEnd);
+    err = SSD1306_SetHVModePageAddr(pSSD1306Handle, pageStart, pageEnd);
+    if (err != SSD1306_ErrOK) return err;
+
+    err = SSD1306_SetHVModeColumnAddr(pSSD1306Handle, xStart, xEnd);
+    if (err != SSD1306_ErrOK) return err;
 
     return err;
 }
 
+/**
+ * @brief Writes text to the specified coordinates of the screen
+ * @param pSSD1306Handle Device handle
+ * @param x Horizontal start position
+ * @param y Vertical start position
+ * @param str The string to be written
+ */
 SSD1306_Error_e SSD1306_WriteHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, char *str) {
     if (
         pSSD1306Handle->DeviceState.AddressingState.AddressingMode != SSD1306_MemAddrHorizontal &&
@@ -221,23 +247,25 @@ SSD1306_Error_e SSD1306_WriteHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uin
     }
 
     SSD1306_Error_e err = SSD1306_ErrOK;
-
-    if (x + strlen(str) * SSD1306_FONT_WIDTH > pSSD1306Handle->DeviceState.AddressingState.ColEndAddr || y + SSD1306_FONT_HEIGHT > pSSD1306Handle->DeviceState.AddressingState.PageEndAddr) {
+    if (x + strlen(str) * pSSD1306Handle->FontWidth > pSSD1306Handle->DeviceState.AddressingState.ColEndAddr || y + pSSD1306Handle->FontHeight > pSSD1306Handle->DeviceState.AddressingState.PageEndAddr * 8) {
         return SSD1306_ErrOutOfBounds;
     }
 
+    // uint32_t currLetter = 0;
     while (*str) {
-        uint8_t *fontChar = get_char_bitmap(*str++);
-        for (uint8_t i = 0; i < SSD1306_FONT_WIDTH; i++) {
-            uint8_t col = fontChar[i];
-            for (uint8_t j = 0; j < SSD1306_FONT_HEIGHT; j++) {
-                if (pSSD1306Handle->DeviceState.AddressingState.AddressingMode == SSD1306_MemAddrHorizontal) {
-                    h_addr_set_pixel(x + i, y + j, (col >> j) & 0x01);
-                } else {
-                    v_addr_set_pixel(x + i, y + j, (col >> j) & 0x01);
-                }
-            }
-        }
+        uint8_t *fontChar = get_char_bitmap(pSSD1306Handle, *str++);
+        if ((err = send_data(pSSD1306Handle, fontChar, pSSD1306Handle->FontWidth)) != SSD1306_ErrOK) return err;
+        // for (uint8_t i = 0; i < SSD1306_FONT_WIDTH; i++) {
+        //     uint8_t col = fontChar[i];
+        //     for (uint8_t j = 0; j < SSD1306_FONT_HEIGHT; j++) {
+        //         if (pSSD1306Handle->DeviceState.AddressingState.AddressingMode == SSD1306_MemAddrHorizontal) {
+        //             h_addr_set_pixel((currLetter * SSD1306_FONT_WIDTH) + (x + i), y + j, (col >> j) & 0x01);
+        //         } else {
+        //             v_addr_set_pixel((currLetter * SSD1306_FONT_WIDTH) + (x + i), y + j, (col >> j) & 0x01);
+        //         }
+        //     }
+        // }
+        // currLetter++;
     }
 
     return err;
@@ -254,7 +282,7 @@ SSD1306_Error_e SSD1306_DrawHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint
     SSD1306_Error_e err = SSD1306_ErrOK;
     uint8_t bytesPerColumn = (height + 7) / 8;
 
-    if (x + width > pSSD1306Handle->DeviceState.AddressingState.ColEndAddr || y + height > pSSD1306Handle->DeviceState.AddressingState.PageEndAddr || width * bytesPerColumn > len) {
+    if (x + width > pSSD1306Handle->DeviceState.AddressingState.ColEndAddr || y + height > pSSD1306Handle->DeviceState.AddressingState.PageEndAddr * 8 || width * bytesPerColumn > len) {
         return SSD1306_ErrOutOfBounds;
     }
 
@@ -291,9 +319,24 @@ SSD1306_Error_e SSD1306_ClearAreaHV(SSD1306_Handle_t *pSSD1306Handle) {
     ) {
         return SSD1306_ErrInvalidAddrMode;
     }
-    memset(frameBuffer, 0, sizeof(frameBuffer));
+    // memset(frameBuffer, 0, sizeof(frameBuffer));
 
-    return SSD1306_UpdateHV(pSSD1306Handle);
+    // Reset cursor
+    SSD1306_Error_e err = SSD1306_SetWriteAreaHV(
+        pSSD1306Handle,
+        pSSD1306Handle->DeviceState.AddressingState.ColStartAddr,
+        pSSD1306Handle->DeviceState.AddressingState.ColEndAddr,
+        pSSD1306Handle->DeviceState.AddressingState.PageStartAddr,
+        pSSD1306Handle->DeviceState.AddressingState.PageEndAddr
+    );
+    if (err != SSD1306_ErrOK) return err;
+
+    uint8_t emptyBuffer[pSSD1306Handle->FontWidth];
+    memset(emptyBuffer, 0, pSSD1306Handle->FontWidth);
+
+    if ((err = send_data(pSSD1306Handle, emptyBuffer, sizeof(emptyBuffer))) != SSD1306_ErrOK) return err;
+
+    return SSD1306_ErrOK;
 }
 
 /**
@@ -312,37 +355,67 @@ SSD1306_Error_e SSD1306_UpdateHV(SSD1306_Handle_t *pSSD1306Handle) {
 }
 
 /**
- * @brief Initializes the device I2C communication
- * @note Before calling this method the required GPIOS \b MUST be configured.\n\n
- * @note Also the i2c handle inside the config structure \b SHOULD include pointer to the i2c peripheral
+ * @brief Initializes the SSD1306 display
+ * @note Before calling this method the required GPIOS and I2C peripheral \b MUST be configured.\n\n
+ * @note The display requires minimum I2C clock speed of 400KHz
  * @param pSSD1306Handle Device handle
  */
-SSD1306_Error_e SSD1306_Init(SSD1306_Handle_t *pSSD1306Handle) {
-    pSSD1306Handle->Config.I2CHandle->I2C_Config.I2C_DeviceAddress = I2C_DeviceAddr7Bits;
-    pSSD1306Handle->Config.I2CHandle->I2C_Config.I2C_SCLSpeed = I2C_SclSpeedSM;
-    pSSD1306Handle->Config.I2CHandle->I2C_Config.I2C_FMDutyCycle = I2C_FmDuty2;
-
-    I2C_Error_e err;
-
-    I2C_PeriClockControl(pSSD1306Handle->Config.I2CHandle->pI2Cx, ENABLE);
-
-    if ((err = I2C_Init(pSSD1306Handle->Config.I2CHandle)) != I2C_ErrOK) {
-        return SSD1306_ErrComm;
-    }
-
+SSD1306_Error_e SSD1306_Init(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Config_t Config) {
+    if (!I2C_PeripheralEnabled(pSSD1306Handle->I2CHandle->pI2Cx)) return SSD1306_ErrI2CNotEnabled;
+    if (pSSD1306Handle->I2CHandle->I2C_Config.I2C_SCLSpeed != I2C_SclSpeedFM4K) return SSD1306_ErrI2CIncorrectSpeed;
     reset_state(pSSD1306Handle);
-    pSSD1306Handle->DeviceInitialized = ENABLE;
+
+    // Reset display
+    // SSD1306_PowerControl(pSSD1306Handle, DISABLE);
+    // Generic_Delay(500);
+    SSD1306_PowerControl(pSSD1306Handle, ENABLE);
+    Generic_Delay(500);
+
+    // MUX ratio
+    SSD1306_Error_e err = SSD1306_SetMuxRatio(pSSD1306Handle, Config.MUXRatio);
+    if (err != SSD1306_ErrOK) return err;
+
+    // Display offset
+    err = SSD1306_SetDisplayOffset(pSSD1306Handle, Config.DisplayOffset);
+    if (err != SSD1306_ErrOK) return err;
+
+    // Display start line
+    err = SSD1306_SetStartLine(pSSD1306Handle, Config.DisplayStartLine);
+    if (err != SSD1306_ErrOK) return err;
+
+    // Segment remapping
+    err = SSD1306_SetSegmentRemap(pSSD1306Handle, Config.SegmentsRemapped);
+    if (err != SSD1306_ErrOK) return err;
+
+    // COM scan direction
+    err = SSD1306_SetCOMScanRemapping(pSSD1306Handle, Config.COMScanRemapped);
+    if (err != SSD1306_ErrOK) return err;
+
+    // COM hardware configuration
+    err = SSD1306_ConfigureCOMPins(pSSD1306Handle, Config.AlternativeCOMPinConfigEnabled, Config.COMLeftRightRemapEnabled);
+    if (err != SSD1306_ErrOK) return err;
+
+    // Contrast
+    err = SSD1306_SetContrast(pSSD1306Handle, Config.Contrast);
+    if (err != SSD1306_ErrOK) return err;
+
+    // Display clock
+    err = SSD1306_SetDivideRatioAndOSCFreq(pSSD1306Handle, Config.DivideRatio, Config.OSCFreq);
+    if (err != SSD1306_ErrOK) return err;
+
+    // Charge pump
+    err = SSD1306_ChargePumpControl(pSSD1306Handle, ENABLE);
+    if (err != SSD1306_ErrOK) return err;
+
     return SSD1306_ErrOK;
 }
 
 /**
- * @brief De-initializes the display and the it's corresponding I2C peripheral
+ * @brief De-initializes the display
  * @param pSSD1306Handle Device handle
  */
 void SSD1306_DeInit(SSD1306_Handle_t *pSSD1306Handle) {
-    I2C_DeInit(pSSD1306Handle->Config.I2CHandle->pI2Cx);
     reset_state(pSSD1306Handle);
-    pSSD1306Handle->DeviceInitialized = DISABLE;
 }
 
 /**
@@ -610,7 +683,7 @@ SSD1306_Error_e SSD1306_SetHVModePageAddr(SSD1306_Handle_t *pSSD1306Handle, SSD1
                                           SSD1306_Page_e EndPage) {
     SSD1306_Error_e err = SSD1306_ErrOK;
 
-    SSD1306_SEND_COMMANDS(pSSD1306Handle, err, SSD1306_CMD_SET_PAGE_ADDR,StartPage, EndPage);
+    SSD1306_SEND_COMMANDS(pSSD1306Handle, err, SSD1306_CMD_SET_PAGE_ADDR, StartPage, EndPage);
     if (err != SSD1306_ErrOK) return err;
 
     pSSD1306Handle->DeviceState.AddressingState.PageStartAddr = StartPage;
@@ -681,7 +754,7 @@ SSD1306_Error_e SSD1306_SetCOMScanRemapping(SSD1306_Handle_t *pSSD1306Handle, ui
 }
 
 /**
- * @brief Controls the display vertical offset§
+ * @brief Controls the display vertical offset
  * @param pSSD1306Handle Device handle
  * @param Value The desired vertical offset
  */
@@ -782,47 +855,77 @@ SSD1306_Error_e SSD1306_SetVCOMHDeselectLevel(SSD1306_Handle_t *pSSD1306Handle, 
     return err;
 }
 
+/**
+ * @brief Enables or disables the display's charge pump
+ * @param pSSD1306Handle Device handle
+ * @param Enabled If the charge pump should be enabled
+ */
+SSD1306_Error_e SSD1306_ChargePumpControl(SSD1306_Handle_t *pSSD1306Handle, uint8_t Enabled) {
+    SSD1306_Error_e err = SSD1306_ErrOK;
+    if (Enabled) {
+        SSD1306_SEND_COMMANDS(pSSD1306Handle, err, SSD1306_CMD_SET_CHARGE_PUMP, 0x14);
+    } else {
+        SSD1306_SEND_COMMANDS(pSSD1306Handle, err, SSD1306_CMD_SET_CHARGE_PUMP, 0x10);
+    }
+    return err;
+}
+
+/**
+ * @brief Enables or disables the display's power source
+ * @param pSSD1306Handle Device handle
+ * @param Enabled If the display main power source should be enabled
+ */
+void SSD1306_PowerControl(SSD1306_Handle_t *pSSD1306Handle, uint8_t Enabled) {
+    GPIO_WriteToOutputPin(pSSD1306Handle->PowerConfig.pGPIOx, pSSD1306Handle->PowerConfig.PinNumber, Enabled ? ENABLE : DISABLE);
+    pSSD1306Handle->DeviceState.PowerEnabled = Enabled;
+}
+
 SSD1306_Error_e send_commands(SSD1306_Handle_t *pSSD1306Handle, uint8_t *commands, uint32_t len) {
-    if (!pSSD1306Handle->DeviceInitialized) return SSD1306_ErrNotInitialized;
     if (len + 1 > SSD1306_I2C_SEND_BUFFER_LEN) return SSD1306_ErrBufferOverflow;
     if (len == 0) return SSD1306_ErrOK;
 
     I2C_Error_e err = I2C_ErrOK;
 
     memset(sendBuffer, 0, sizeof(sendBuffer));
-    I2C_PeripheralControl(pSSD1306Handle->Config.I2CHandle->pI2Cx, ENABLE);
 
     sendBuffer[0] = 0x00;                       // Co == 0 && D/C# == 0
     memcpy(sendBuffer + 1, commands, len);
 
-    err = I2C_MasterSendData(pSSD1306Handle->Config.I2CHandle, sendBuffer, len + 1, SSD1306_I2C_ADDR, I2C_StopEnabled);
+    err = I2C_MasterSendData(pSSD1306Handle->I2CHandle, sendBuffer, len + 1, SSD1306_I2C_ADDR, I2C_StopEnabled);
 
-    I2C_PeripheralControl(pSSD1306Handle->Config.I2CHandle->pI2Cx, DISABLE);
     return err == I2C_ErrOK ? SSD1306_ErrOK : SSD1306_ErrComm;
 }
 
 SSD1306_Error_e send_data(SSD1306_Handle_t *pSSD1306Handle, uint8_t *data, uint32_t len) {
-    if (!pSSD1306Handle->DeviceInitialized) return SSD1306_ErrNotInitialized;
     if (len + 1 > SSD1306_I2C_SEND_BUFFER_LEN) return SSD1306_ErrBufferOverflow;
     I2C_Error_e err = I2C_ErrOK;
 
-    I2C_PeripheralControl(pSSD1306Handle->Config.I2CHandle->pI2Cx, ENABLE);
-
     memset(sendBuffer, 0, sizeof(sendBuffer));
 
-    sendBuffer[0] = (1 << SSD1306_COMM_DC_BIT_POS);      // Co == 0 && D/C# == 1
-    memcpy(sendBuffer + 1, data, len);
+    uint32_t totalLen = len + 1;
+    uint32_t offset = 0;
+    while (offset < totalLen) {
+        uint8_t chunkSize = (totalLen - offset) > 16 ? 16 : (totalLen - offset);
 
-    err = I2C_MasterSendData(pSSD1306Handle->Config.I2CHandle, sendBuffer, len + 1, SSD1306_I2C_ADDR, I2C_StopEnabled);
+        uint8_t buffer[chunkSize + 1];
 
-    I2C_PeripheralControl(pSSD1306Handle->Config.I2CHandle->pI2Cx, DISABLE);
-    return err == I2C_ErrOK ? SSD1306_ErrOK : SSD1306_ErrComm;
+        // Control byte
+        buffer[0] = (1 << SSD1306_COMM_DC_BIT_POS);  // Co == 0 && D/C# == 1
+        memcpy(buffer + 1, data + offset, chunkSize);
+
+        err = I2C_MasterSendData(pSSD1306Handle->I2CHandle, buffer, chunkSize + 1, SSD1306_I2C_ADDR, I2C_StopEnabled);
+        if (err != I2C_ErrOK) return SSD1306_ErrComm;
+
+        offset += chunkSize;
+    }
+
+    return err;
 }
 
 void h_addr_set_pixel(uint8_t x, uint8_t y, uint8_t on) {
     uint8_t page = y / 8;
     uint8_t bit = y % 8;
-    uint32_t index = page * (SSD1306_MAX_WIDTH + 1) + x;
+    uint32_t index = page * (SSD1306_MAX_WIDTH) + x;
 
     if (on) frameBuffer[index] |= (1 << bit);
     else frameBuffer[index] &=~ (1 << bit);
@@ -837,14 +940,21 @@ void v_addr_set_pixel(uint8_t x, uint8_t y, uint8_t on) {
     else frameBuffer[colOffset + page] &=~ (1 << bit);
 }
 
-uint8_t *get_char_bitmap(char c) {
-    if (c < 32 || c > 97) c = '?';
-    return font6x8[c - 32];
+uint8_t *get_char_bitmap(SSD1306_Handle_t *pSSD1306Handle, char c) {
+    if (c < 32 || c > 122) c = '?';
+    uint8_t horizontalMode = pSSD1306Handle->DeviceState.AddressingState.AddressingMode == SSD1306_MemAddrHorizontal;
+    switch (pSSD1306Handle->Font) {
+        case SSD1306_Font6x8:
+            return horizontalMode ? font6x8PAGE[c - 32] : font6x8PAGE[c - 32];
+        default: return font6x8PAGE[c - 32];
+    }
 }
 
 void reset_state(SSD1306_Handle_t *pSSD1306Handle) {
+    pSSD1306Handle->DeviceState.PowerEnabled = DISABLE;
     pSSD1306Handle->DeviceState.Contrast = 0x7F;
     pSSD1306Handle->DeviceState.EntireDisplayON = DISABLE;
+    pSSD1306Handle->DeviceState.ChargePumpEnabled = DISABLE;
     pSSD1306Handle->DeviceState.DisplayInversed = DISABLE;
     pSSD1306Handle->DeviceState.DisplayMode = SSD1306_DisplayModeSleep;
 

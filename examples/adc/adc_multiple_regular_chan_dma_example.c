@@ -33,7 +33,7 @@ GPIO_Handle_t gpioHandle = {
 
 ADC_Handle_t adcHandle = {
     .Config = {
-        .Prescaler = ADC_Perscaler2,
+        .Prescaler = ADC_Prescaler2,
         .Resolution = ADC_Resolution12bit,
         .DataAlignment = ADC_DataAlignRight,
         .SamplingTimes = {0},
@@ -78,7 +78,7 @@ int main(void) {
 
     ADC_PeripheralControl(ENABLE);
 
-    err = ADC_StartRegularChannelsReadDMA(&adcHandle);
+    err = ADC_StartDMA(&adcHandle);
 
     // Update channel sequence on the go
     ADC_Channel_e newChannels[2] = {ADC_Channel4, ADC_Channel3};
