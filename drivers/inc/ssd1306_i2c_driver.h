@@ -126,6 +126,7 @@ typedef enum {
     SSD1306_ErrBufferOverflow,
     SSD1306_ErrInvalidAddrMode,
     SSD1306_ErrOutOfBounds,
+    SSD1306_ErrInvalidFont
 } SSD1306_Error_e;
 
 typedef enum {
@@ -164,8 +165,7 @@ typedef enum {
 
 typedef enum {
     SSD1306_MemAddrHorizontal,
-    SSD1306_MemAddrVertical,
-    SSD1306_MemAddrPage,
+    SSD1306_MemAddrPage = 2,
 } SSD1306_MemoryAddressingMode_e;
 
 typedef enum {
@@ -173,6 +173,12 @@ typedef enum {
     SSD1306_VCOMHLevelMode1 = 2,    // ∼ 0.77 * Vcc
     SSD1306_VCOMHLevelMode2,        // ∼ 0.83 * Vcc
 } SSD1306_VCOMHDeselectLevel_e;
+
+typedef enum {
+    SSD1306_Font8x8,
+    SSD1306_Font8x16,
+    SSD1306_Font16x15,
+} SSD1306_Font_e;
 
 /* ------------ CONFIG STRUCTURES ------------ */
 
@@ -249,23 +255,24 @@ typedef struct {
     uint8_t PinNumber;
 } SSD1306_PwrGPIOConfig;
 
-typedef enum {
-    SSD1306_Font6x8
-} SSD1306_Font_e;
+typedef struct {
+    SSD1306_Font_e Font;
+    uint8_t Mirrored;
+    uint8_t Width;
+    uint8_t Height;
+} SSD1306_FontConfig_t;
 
 typedef struct {
     I2C_Handle_t *I2CHandle;
     SSD1306_PwrGPIOConfig PowerConfig;
+    SSD1306_FontConfig_t FontConfig;
     SSD1306_State_t DeviceState;
-    SSD1306_Font_e Font;
-    uint8_t FontWidth;
-    uint8_t FontHeight;
 } SSD1306_Handle_t;
 
 /* ------------ DATA DISPLAY METHODS ------------ */
 
 // Fonts
-void SSD1306_SetFont(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Font_e Font);
+SSD1306_Error_e SSD1306_SetFont(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Font_e Font, uint8_t Mirrored);
 
 // Page addressing mode
 SSD1306_Error_e SSD1306_SetCursor(SSD1306_Handle_t *pSSD1306Handle, uint8_t Column, SSD1306_Page_e Page);
@@ -273,11 +280,11 @@ SSD1306_Error_e SSD1306_Write(SSD1306_Handle_t *pSSD1306Handle, char *str);
 SSD1306_Error_e SSD1306_Clear(SSD1306_Handle_t *pSSD1306Handle);
 
 // Horizontal / Vertical addressing mode
-SSD1306_Error_e SSD1306_SetWriteAreaHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t xStart, uint8_t xEnd, uint8_t yStart, uint8_t yEnd);
-SSD1306_Error_e SSD1306_WriteHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, char *str);
-SSD1306_Error_e SSD1306_DrawHV(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint8_t *bitmap, uint8_t len);
-SSD1306_Error_e SSD1306_ClearAreaHV(SSD1306_Handle_t *pSSD1306Handle);
-SSD1306_Error_e SSD1306_UpdateHV(SSD1306_Handle_t *pSSD1306Handle);
+SSD1306_Error_e SSD1306_SetWriteAreaH(SSD1306_Handle_t *pSSD1306Handle, uint8_t xStart, uint8_t xEnd, uint8_t yStart, uint8_t yEnd);
+SSD1306_Error_e SSD1306_WriteH(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, char *str);
+SSD1306_Error_e SSD1306_DrawH(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint8_t *bitmap, uint8_t len);
+SSD1306_Error_e SSD1306_ClearAreaH(SSD1306_Handle_t *pSSD1306Handle);
+SSD1306_Error_e SSD1306_UpdateH(SSD1306_Handle_t *pSSD1306Handle);
 
 
 /* ------------ COMMAND METHODS ------------ */

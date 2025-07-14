@@ -138,12 +138,13 @@ int main(void) {
         .OSCFreq = 0xF
     };
 
-    SSD1306_SetFont(&display, SSD1306_Font6x8);
     SSD1306_Error_e displayErr = SSD1306_Init(&display, displayConfig);
+    displayErr = SSD1306_SetFont(&display, SSD1306_Font8x16, DISABLE);
     displayErr = SSD1306_SetMemoryAddrMode(&display, SSD1306_MemAddrHorizontal);
-    displayErr = SSD1306_SetWriteAreaHV(&display, SSD1306_MIN_WIDTH, SSD1306_MAX_WIDTH, SSD1306_MIN_HEIGHT, SSD1306_MAX_HEIGHT);
+    displayErr = SSD1306_SetWriteAreaH(&display, SSD1306_MIN_WIDTH, SSD1306_MAX_WIDTH - 1, SSD1306_MIN_HEIGHT, SSD1306_MAX_HEIGHT);
     displayErr = SSD1306_DisplayControl(&display, ENABLE);
-    displayErr = SSD1306_ClearAreaHV(&display);
+    displayErr = SSD1306_ClearAreaH(&display);
+    displayErr = SSD1306_UpdateH(&display);
 
     if (displayErr) {
         while (1) {
@@ -159,8 +160,8 @@ int main(void) {
             Generic_Delay(1000);
             GPIO_ToggleOutputPin(GPIOC, LED_PIN);
             // SSD1306_ClearAreaHV(&display);
-            displayErr = SSD1306_SetWriteAreaHV(&display, SSD1306_MIN_WIDTH, SSD1306_MAX_WIDTH - 1, SSD1306_MIN_HEIGHT, SSD1306_MAX_HEIGHT);
-            displayErr = SSD1306_WriteHV(&display, 0, 0, "Hello, World ");
+            displayErr = SSD1306_SetWriteAreaH(&display, SSD1306_MIN_WIDTH, SSD1306_MAX_WIDTH - 1, SSD1306_MIN_HEIGHT, SSD1306_MAX_HEIGHT);
+            displayErr = SSD1306_WriteH(&display, 0, 0, "Hello");
 
             // char buffer[4];
             // sprintf(buffer, "%d", counter);
@@ -168,6 +169,7 @@ int main(void) {
 
             // displayErr = SSD1306_DrawHV(&display, 10, 10, 8, 8, sunImg, sizeof(sunImg));
 
+            displayErr = SSD1306_UpdateH(&display);
             counter++;
         }
     };

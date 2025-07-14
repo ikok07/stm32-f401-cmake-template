@@ -125,7 +125,7 @@ int main(void) {
         .OSCFreq = 0x04
     };
 
-    SSD1306_SetFont(&display, SSD1306_Font6x8);
+    SSD1306_SetFont(&display, SSD1306_Font8x8);
     SSD1306_Error_e displayErr = SSD1306_Init(&display, displayConfig);
     displayErr = SSD1306_SetMemoryAddrMode(&display, SSD1306_MemAddrPage);
     displayErr = SSD1306_Clear(&display);
