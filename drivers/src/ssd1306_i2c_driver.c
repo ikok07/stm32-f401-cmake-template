@@ -32,7 +32,7 @@ static void reset_state(SSD1306_Handle_t *pSSD1306Handle);
 
 /* ------ FONTS ------ */
 
-uint8_t font8x8[96][8] = {
+static uint8_t font8x8[96][8] = {
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},   // U+0020 (space)
     { 0x18, 0x3C, 0x3C, 0x18, 0x18, 0x00, 0x18, 0x00},   // U+0021 (!)
     { 0x36, 0x36, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},   // U+0022 (")
@@ -131,7 +131,7 @@ uint8_t font8x8[96][8] = {
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}    // U+007F
 };
 
-uint8_t font8x16[96][16] = {
+static uint8_t font8x16[96][16] = {
         { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  },       //0x20, ' '
         { 0x00, 0x00, 0x18, 0x3C, 0x3C, 0x3C, 0x18, 0x18, 0x18, 0x00, 0x18, 0x18, 0x00, 0x00, 0x00, 0x00,  },       //0x21, '!'
         { 0x00, 0x66, 0x66, 0x66, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  },       //0x22, '"'
@@ -422,6 +422,13 @@ static uint16_t font16x15 [96][15] = {
     {0x0000,0x0000,0x0000,0x0000,0x0000,0x0000,0x0C20,0x1320,0x11C0,0x0000,0x0000,0x0000,0x0000,0x0000,0x0000},
 };
 
+/**
+ * @brief Sets the desired font to be used when displaying characters on the display.
+ * \b WARNING Page addressing mode uses only the default 8x8 font
+ * @param pSSD1306Handle Device handle
+ * @param Font The desired font
+ * @param Mirrored Some fonts require to be mirrored
+ */
 SSD1306_Error_e SSD1306_SetFont(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Font_e Font, uint8_t Mirrored) {
     if (pSSD1306Handle->DeviceState.AddressingState.AddressingMode != SSD1306_MemAddrPage && Font != SSD1306_Font8x8) {
         return SSD1306_ErrInvalidFont;
@@ -587,17 +594,58 @@ SSD1306_Error_e SSD1306_DrawH(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8
         return SSD1306_ErrOutOfBounds;
     }
 
-    for (uint8_t col = 0; col < width; col++) {
-        // Column
-        for (int byteInCol = 0; byteInCol < bytesPerColumn; byteInCol++) {
-            // Byte of column
-            uint8_t colData = bitmap[col * bytesPerColumn + byteInCol];
-            for (uint8_t bit = 0; bit < 8; bit++) {
-                // Bit of the column byte
-                uint8_t pixelRow = byteInCol * 8 + bit;
-                if (pixelRow >= height) break;
-
-                h_addr_set_pixel(x + col, y + pixelRow, (colData >> bit) & 0x01);
+    if (width > height) {
+        // Several bytes represent a single row
+        uint8_t bytesPerRow = width / 8;
+        for (int row = 0; row < height; row++) {
+            for (int rowChunk = 0; rowChunk < bytesPerRow; rowChunk++) {
+                // One part of the row
+                uint8_t rowChunkContent = bitmap[row * bytesPerRow + rowChunk];
+                for (int bit = 0; bit < 8; bit++) {
+                    uint8_t col = rowChunk * 8 + bit;
+                    // One column of the row
+                    h_addr_set_pixel(
+                        x + col,
+                        y + row,
+                        (rowChunkContent >> (7 - bit)) & 0x01          // MSB first
+                    );
+                }
+            }
+        }
+    } else if (height > width) {
+        // Several bytes represent a single column
+        uint8_t bytesPerCol = height / 8;
+        for (int col = 0; col < width; col++) {
+            for (int colChunk = 0; colChunk < bytesPerCol; colChunk++) {
+                // One part of the column
+                uint8_t colChunkContent = bitmap[col * bytesPerCol + colChunk];
+                for (int bit = 0; bit < 8; bit++) {
+                    uint8_t row = colChunk * 8 + bit;
+                    // One column of the row
+                    h_addr_set_pixel(
+                        x + col,
+                        y + row,
+                        (colChunkContent >> (7 - bit)) & 0x01          // MSB first
+                    );
+                }
+            }
+        }
+    } else {
+        // Several bytes represent a single column and a single row
+        uint8_t bytesPerRow = width / 8;
+        for (int row = 0; row < height; row++) {
+            for (int rowChunk = 0; rowChunk < bytesPerRow; rowChunk++) {
+                // One part of the row
+                uint8_t rowChunkContent = bitmap[row * bytesPerRow + rowChunk];
+                for (int bit = 0; bit < 8; bit++) {
+                    uint8_t col = rowChunk * 8 + bit;
+                    // One column of the row
+                    h_addr_set_pixel(
+                        x + col,
+                        y + row,
+                        ((rowChunkContent >> (7 - bit)) & 0x01)          // MSB first
+                    );
+                }
             }
         }
     }
