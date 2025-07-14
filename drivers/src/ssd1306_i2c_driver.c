@@ -520,7 +520,7 @@ SSD1306_Error_e SSD1306_Clear(SSD1306_Handle_t *pSSD1306Handle) {
 }
 
 /**
- * @brief Sets the write area in HORIZONTAL / VERTICAL ADDRESSING MODE
+ * @brief Sets the write area in HORIZONTAL ADDRESSING MODE
  * @param pSSD1306Handle Device handle
  * @param xStart Desired start x position
  * @param xEnd Desired end x position
@@ -541,10 +541,10 @@ SSD1306_Error_e SSD1306_SetWriteAreaH(SSD1306_Handle_t *pSSD1306Handle, uint8_t 
     uint8_t pageStart = yStart / 8;
     uint8_t pageEnd = yEnd / 8;
 
-    err = SSD1306_SetHVModePageAddr(pSSD1306Handle, pageStart, pageEnd);
+    err = SSD1306_SetHModePageAddr(pSSD1306Handle, pageStart, pageEnd);
     if (err != SSD1306_ErrOK) return err;
 
-    err = SSD1306_SetHVModeColumnAddr(pSSD1306Handle, xStart, xEnd);
+    err = SSD1306_SetHModeColumnAddr(pSSD1306Handle, xStart, xEnd);
     if (err != SSD1306_ErrOK) return err;
 
     return err;
@@ -565,7 +565,8 @@ SSD1306_Error_e SSD1306_WriteH(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint
     }
 
     SSD1306_Error_e err = SSD1306_ErrOK;
-    if (x + strlen(str) * pSSD1306Handle->FontConfig.Width > pSSD1306Handle->DeviceState.AddressingState.ColEndAddr || y + pSSD1306Handle->FontConfig.Height > pSSD1306Handle->DeviceState.AddressingState.PageEndAddr * 8) {
+    uint8_t maxPage = pSSD1306Handle->DeviceState.AddressingState.PageEndAddr > 3 ? 4 : pSSD1306Handle->DeviceState.AddressingState.PageEndAddr;
+    if (x + strlen(str) * pSSD1306Handle->FontConfig.Width > pSSD1306Handle->DeviceState.AddressingState.ColEndAddr + 1 || y + pSSD1306Handle->FontConfig.Height > maxPage * 8) {
         return SSD1306_ErrOutOfBounds;
     }
 
@@ -590,7 +591,8 @@ SSD1306_Error_e SSD1306_DrawH(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8
     SSD1306_Error_e err = SSD1306_ErrOK;
     uint8_t bytesPerColumn = (height + 7) / 8;
 
-    if (x + width > pSSD1306Handle->DeviceState.AddressingState.ColEndAddr || y + height > pSSD1306Handle->DeviceState.AddressingState.PageEndAddr * 8 || width * bytesPerColumn > len) {
+    uint8_t maxPage = pSSD1306Handle->DeviceState.AddressingState.PageEndAddr > 3 ? 4 : pSSD1306Handle->DeviceState.AddressingState.PageEndAddr;
+    if (x + width > pSSD1306Handle->DeviceState.AddressingState.ColEndAddr + 1 || y + height > maxPage * 8 || width * bytesPerColumn > len) {
         return SSD1306_ErrOutOfBounds;
     }
 
@@ -654,10 +656,10 @@ SSD1306_Error_e SSD1306_DrawH(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8
 }
 
 /**
- * @brief Clears the selected display area in HORIZONTAL / VERTICAL ADDRESSING MODE
+ * @brief Clears the selected display area in HORIZONTAL ADDRESSING MODE
  * @param pSSD1306Handle Device handle
  */
-SSD1306_Error_e SSD1306_ClearAreaH(SSD1306_Handle_t *pSSD1306Handle) {
+SSD1306_Error_e SSD1306_ClearH(SSD1306_Handle_t *pSSD1306Handle) {
     if (
         pSSD1306Handle->DeviceState.AddressingState.AddressingMode != SSD1306_MemAddrHorizontal
     ) {
@@ -669,7 +671,7 @@ SSD1306_Error_e SSD1306_ClearAreaH(SSD1306_Handle_t *pSSD1306Handle) {
 }
 
 /**
- * @brief Updates the whole display in HORIZONTAL / VERTICAL ADDRESSING MODE
+ * @brief Updates the whole display in HORIZONTAL ADDRESSING MODE
  * @param pSSD1306Handle Device handle
  */
 SSD1306_Error_e SSD1306_UpdateH(SSD1306_Handle_t *pSSD1306Handle) {
@@ -694,10 +696,10 @@ SSD1306_Error_e SSD1306_Init(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Config_t 
     reset_state(pSSD1306Handle);
 
     // Reset display
-    // SSD1306_PowerControl(pSSD1306Handle, DISABLE);
-    // Generic_Delay(500);
+    SSD1306_PowerControl(pSSD1306Handle, DISABLE);
+    Generic_Delay(100);
     SSD1306_PowerControl(pSSD1306Handle, ENABLE);
-    Generic_Delay(500);
+    Generic_Delay(100);
 
     // MUX ratio
     SSD1306_Error_e err = SSD1306_SetMuxRatio(pSSD1306Handle, Config.MUXRatio);
@@ -733,6 +735,10 @@ SSD1306_Error_e SSD1306_Init(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Config_t 
 
     // Charge pump
     err = SSD1306_ChargePumpControl(pSSD1306Handle, ENABLE);
+    if (err != SSD1306_ErrOK) return err;
+
+    // Font
+    err = SSD1306_SetFont(pSSD1306Handle, Config.Font, Config.FontMirrored);
     if (err != SSD1306_ErrOK) return err;
 
     return SSD1306_ErrOK;
@@ -986,7 +992,7 @@ SSD1306_Error_e SSD1306_SetMemoryAddrMode(SSD1306_Handle_t *pSSD1306Handle, SSD1
  * @param StartAddr The desired column start address
  * @param EndAddr The desired column end address
  */
-SSD1306_Error_e SSD1306_SetHVModeColumnAddr(SSD1306_Handle_t *pSSD1306Handle, uint8_t StartAddr, uint8_t EndAddr) {
+SSD1306_Error_e SSD1306_SetHModeColumnAddr(SSD1306_Handle_t *pSSD1306Handle, uint8_t StartAddr, uint8_t EndAddr) {
     if (StartAddr < SSD1306_MIN_COL_ADDR || StartAddr > SSD1306_MAX_COL_ADDR || EndAddr < SSD1306_MIN_COL_ADDR || EndAddr > SSD1306_MAX_COL_ADDR) {
         return SSD1306_ErrInvalidArg;
     }
@@ -1002,12 +1008,12 @@ SSD1306_Error_e SSD1306_SetHVModeColumnAddr(SSD1306_Handle_t *pSSD1306Handle, ui
 
 /**
  * @brief Sets the desired start and end page addresses
- * @note This method is valid ONLY when the device is in HORIZONTAL OR VERTICAL ACCESSING MODE
+ * @note This method is valid ONLY when the device is in HORIZONTAL ACCESSING MODE
  * @param pSSD1306Handle Device handle
  * @param StartPage The desired start page
  * @param EndPage The desired end page
  */
-SSD1306_Error_e SSD1306_SetHVModePageAddr(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Page_e StartPage,
+SSD1306_Error_e SSD1306_SetHModePageAddr(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Page_e StartPage,
                                           SSD1306_Page_e EndPage) {
     SSD1306_Error_e err = SSD1306_ErrOK;
 

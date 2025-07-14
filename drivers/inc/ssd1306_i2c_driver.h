@@ -245,6 +245,8 @@ typedef struct {
     uint8_t Contrast;
     uint8_t DivideRatio;
     uint8_t OSCFreq;
+    SSD1306_Font_e Font;
+    uint8_t FontMirrored;
 } SSD1306_Config_t;
 
 /**
@@ -283,7 +285,7 @@ SSD1306_Error_e SSD1306_Clear(SSD1306_Handle_t *pSSD1306Handle);
 SSD1306_Error_e SSD1306_SetWriteAreaH(SSD1306_Handle_t *pSSD1306Handle, uint8_t xStart, uint8_t xEnd, uint8_t yStart, uint8_t yEnd);
 SSD1306_Error_e SSD1306_WriteH(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, char *str);
 SSD1306_Error_e SSD1306_DrawH(SSD1306_Handle_t *pSSD1306Handle, uint8_t x, uint8_t y, uint8_t width, uint8_t height, uint8_t *bitmap, uint8_t len);
-SSD1306_Error_e SSD1306_ClearAreaH(SSD1306_Handle_t *pSSD1306Handle);
+SSD1306_Error_e SSD1306_ClearH(SSD1306_Handle_t *pSSD1306Handle);
 SSD1306_Error_e SSD1306_UpdateH(SSD1306_Handle_t *pSSD1306Handle);
 
 
@@ -319,8 +321,8 @@ SSD1306_Error_e SSD1306_SetPageModeColumnLowerNibble(SSD1306_Handle_t *pSSD1306H
 SSD1306_Error_e SSD1306_SetPageModeColumnHigherNibble(SSD1306_Handle_t *pSSD1306Handle, uint8_t ColHigherAddr);
 SSD1306_Error_e SSD1306_SetPageModeStartPage(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Page_e Page);
 SSD1306_Error_e SSD1306_SetMemoryAddrMode(SSD1306_Handle_t *pSSD1306Handle, SSD1306_MemoryAddressingMode_e Mode);
-SSD1306_Error_e SSD1306_SetHVModeColumnAddr(SSD1306_Handle_t *pSSD1306Handle, uint8_t StartAddr, uint8_t EndAddr);
-SSD1306_Error_e SSD1306_SetHVModePageAddr(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Page_e StartPage, SSD1306_Page_e EndPage);
+SSD1306_Error_e SSD1306_SetHModeColumnAddr(SSD1306_Handle_t *pSSD1306Handle, uint8_t StartAddr, uint8_t EndAddr);
+SSD1306_Error_e SSD1306_SetHModePageAddr(SSD1306_Handle_t *pSSD1306Handle, SSD1306_Page_e StartPage, SSD1306_Page_e EndPage);
 
 /*
  * Hardware Configuration
